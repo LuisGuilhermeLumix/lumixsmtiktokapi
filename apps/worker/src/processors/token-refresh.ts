@@ -37,7 +37,8 @@ export function createTokenRefreshProcessor(deps: WorkerDeps) {
         await deps.queues.tokenRefresh.add(
           "refresh-account",
           { socialAccountId: account.id },
-          { jobId: `token-refresh:${account.id}:${Date.now()}` },
+          // separador "-": BullMQ proíbe ":" em jobIds customizados
+          { jobId: `token-refresh-${account.id}-${Date.now()}` },
         );
       }
       await job.log(`fan-out: ${connected?.length ?? 0} conta(s) p/ renovar`);

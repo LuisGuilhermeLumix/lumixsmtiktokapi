@@ -29,7 +29,11 @@ export interface TokenRefreshJobData {
   socialAccountId?: string;
 }
 
-/** jobId determinístico p/ dedupe e cancelamento de jobs de publicação */
+/**
+ * jobId determinístico p/ dedupe e cancelamento de jobs de publicação.
+ * Separador "-" obrigatório: o BullMQ proíbe ":" em jobIds customizados
+ * (é o separador de chaves dele no Redis).
+ */
 export function publishJobId(postTargetId: string): string {
-  return `target:${postTargetId}`;
+  return `target-${postTargetId}`;
 }

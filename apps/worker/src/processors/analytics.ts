@@ -23,7 +23,8 @@ export function createAnalyticsProcessor(deps: WorkerDeps) {
         await deps.queues.analytics.add(
           "collect-account",
           { socialAccountId: account.id },
-          { jobId: `analytics:${account.id}:${Date.now()}` },
+          // separador "-": BullMQ proíbe ":" em jobIds customizados
+          { jobId: `analytics-${account.id}-${Date.now()}` },
         );
       }
       await job.log(`fan-out: ${accounts?.length ?? 0} conta(s)`);

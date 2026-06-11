@@ -39,6 +39,7 @@ export async function enqueueStatusCheck(
   await deps.queues.status.add(
     "check",
     { postTargetId, publishId, attempt },
-    { delay: delayMs, jobId: `status:${postTargetId}:${attempt}` },
+    // separador "-": BullMQ proíbe ":" em jobIds customizados
+    { delay: delayMs, jobId: `status-${postTargetId}-${attempt}` },
   );
 }
