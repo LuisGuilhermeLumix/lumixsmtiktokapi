@@ -1,0 +1,22 @@
+{
+  "name": "lumix-social-manager",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Lumix Social Manager (LSM) — SaaS multi-tenant para agências gerenciarem contas TikTok de clientes",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "dev:web": "pnpm --filter @lsm/web dev",
+    "dev:api": "pnpm --filter @lsm/api dev",
+    "dev:worker": "pnpm --filter @lsm/worker dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

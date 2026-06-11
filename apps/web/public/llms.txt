@@ -1,0 +1,8 @@
+# Lumix Social Manager (LSM)
+> SaaS da Lumix Agency para agências gerenciarem contas TikTok de clientes: conexão OAuth oficial, publicação e agendamento de vídeos, analytics automático e integração com automações (n8n / API REST).
+
+- Serviço principal: gestão multi-cliente de TikTok (publicar, agendar, medir)
+- Público: agências de marketing e gestores de social media
+- Diferenciais: OAuth oficial (sem senhas), tokens criptografados, fila com retry, fallback para rascunho, analytics a cada 6h, API com API key + webhooks n8n
+- Operado por: Lumix Agency
+- Página: definida em NEXT_PUBLIC_SITE_URL
