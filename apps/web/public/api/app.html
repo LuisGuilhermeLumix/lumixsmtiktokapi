@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumix Social Manager — Dashboard</title>
+    <link rel="icon" type="image/png" href="./logolumix.png">
+    <link rel="apple-touch-icon" href="./logolumix.png">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #06060a;
+            --bg-secondary: #0a0a10;
+            --bg-card: #0e0e14;
+            --bg-elevated: #14141d;
+            --border: #1e1e2a;
+            --border-hover: #2e2e3a;
+            --text: #f0f0f5;
+            --text-secondary: #9494a8;
+            --text-muted: #5e5e72;
+            --accent: #00e59a;
+            --accent-hover: #00cc88;
+            --accent-dim: rgba(0, 229, 154, 0.1);
+            --accent-glow: rgba(0, 229, 154, 0.15);
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --tiktok: #fe2c55;
+            --purple: #8b5cf6;
+            --blue: #3b82f6;
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── LAYOUT ── */
+        .app { display: flex; min-height: 100vh; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: 250px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 20px 14px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            z-index: 10;
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 4px 10px 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .sidebar-logo .icon {
+            width: 34px; height: 34px;
+            border-radius: 9px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .sidebar-logo span { font-weight: 700; font-size: 15px; letter-spacing: -0.3px; }
+
+        .nav-label {
+            font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1.5px;
+            color: var(--text-muted);
+            padding: 0 10px; margin-bottom: 8px; margin-top: 18px;
+        }
+
+        .nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: var(--radius-sm);
+            color: var(--text-secondary); cursor: pointer;
+            transition: all 0.15s; font-size: 14px; font-weight: 450; margin-bottom: 2px;
+        }
+
+        .nav-item:hover { background: var(--bg-elevated); color: var(--text); }
+        .nav-item.active { background: var(--accent-dim); color: var(--accent); }
+        .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 16px 10px 0;
+            border-top: 1px solid var(--border);
+            font-size: 12px; color: var(--text-muted);
+        }
+
+        /* ── MAIN ── */
+        .main { flex: 1; margin-left: 250px; padding: 28px 36px; max-width: 920px; }
+
+        .page-header { margin-bottom: 28px; }
+        .page-header h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
+        .page-header p { color: var(--text-secondary); font-size: 14px; }
+
+        /* ── CARDS ── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+            margin-bottom: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .card:hover { border-color: var(--border-hover); }
+
+        .card-title {
+            font-size: 14px; font-weight: 700; margin-bottom: 16px;
+            display: flex; align-items: center; gap: 8px;
+            color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        /* ── BUTTONS ── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 18px; border-radius: var(--radius-sm);
+            font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600;
+            border: none; cursor: pointer; transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--accent); color: #06060a; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+        .btn-tiktok { background: var(--tiktok); color: #fff; padding: 14px 28px; font-size: 15px; border-radius: var(--radius); }
+        .btn-tiktok:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        .btn-outline { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+        .btn-outline:hover { border-color: var(--text-muted); color: var(--text); }
+
+        .btn-danger { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.15); }
+
+        .btn-sm { padding: 7px 14px; font-size: 13px; }
+
+        /* ── CREATOR PROFILE ── */
+        .creator-profile {
+            display: flex; align-items: center; gap: 16px;
+            padding: 16px; background: var(--bg-elevated);
+            border-radius: var(--radius-sm); margin-bottom: 18px;
+        }
+
+        .creator-avatar {
+            width: 50px; height: 50px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--tiktok), var(--purple));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 700; color: #fff; overflow: hidden;
+        }
+
+        .creator-info h3 { font-size: 16px; font-weight: 700; }
+        .creator-info p { font-size: 13px; color: var(--text-muted); }
+
+        .creator-badge {
+            margin-left: auto;
+            background: var(--accent-dim); color: var(--accent);
+            font-size: 12px; font-weight: 600;
+            padding: 5px 12px; border-radius: 20px;
+        }
+
+        /* ── FORM ── */
+        .form-group { margin-bottom: 18px; }
+
+        .form-group label {
+            display: block; font-size: 12px; font-weight: 600;
+            color: var(--text-secondary); margin-bottom: 6px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; padding: 11px 14px;
+            background: var(--bg-elevated); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); color: var(--text);
+            font-family: 'Outfit', sans-serif; font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none; border-color: var(--accent);
+        }
+
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+        /* ── UPLOAD AREA ── */
+        .upload-area {
+            border: 2px dashed var(--border); border-radius: var(--radius);
+            padding: 44px; text-align: center; cursor: pointer;
+            transition: all 0.2s; margin-bottom: 18px;
+        }
+
+        .upload-area:hover { border-color: var(--accent); background: var(--accent-dim); }
+
+        .upload-area.has-file {
+            border-style: solid; border-color: var(--accent); background: var(--accent-dim);
+        }
+
+        .upload-area .icon-upload { font-size: 36px; margin-bottom: 10px; display: block; color: var(--text-muted); }
+        .upload-area p { color: var(--text-secondary); font-size: 14px; }
+        .upload-area .file-name { color: var(--accent); font-weight: 700; font-size: 15px; }
+
+        /* ── STATUS ── */
+        .status {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
+        }
+
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; }
+        .status-success { background: rgba(0,229,154,0.1); color: var(--accent); }
+        .status-success .status-dot { background: var(--accent); }
+        .status-pending { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .status-pending .status-dot { background: var(--warning); }
+
+        /* ── CONFIG ROW ── */
+        .config-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 0; border-bottom: 1px solid var(--border);
+        }
+        .config-row:last-child { border-bottom: none; }
+        .config-label { font-size: 14px; font-weight: 500; }
+        .config-value {
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            color: var(--text-muted); background: var(--bg-elevated);
+            padding: 4px 10px; border-radius: 6px;
+        }
+
+        /* ── LOG ── */
+        .log-entry {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+        }
+        .log-entry:last-child { border-bottom: none; }
+        .log-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); min-width: 50px; }
+
+        /* ── CONNECT SCREEN ── */
+        .connect-screen {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center; padding: 80px 40px;
+        }
+
+        .connect-icon {
+            width: 80px; height: 80px;
+            background: var(--bg-elevated); border-radius: 24px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 28px; font-size: 40px;
+            border: 1px solid var(--border);
+        }
+
+        .connect-screen h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+        .connect-screen > p { color: var(--text-secondary); max-width: 380px; margin-bottom: 32px; line-height: 1.6; }
+
+        /* ── OAUTH MODAL ── */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center; z-index: 100;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: #fff; color: #1a1a1a; border-radius: 16px;
+            width: 420px; max-width: 90vw; overflow: hidden;
+            animation: scaleIn 0.3s ease;
+        }
+
+        .modal-header {
+            padding: 20px 24px; border-bottom: 1px solid #e5e5e5;
+            display: flex; align-items: center; gap: 12px;
+        }
+
+        .modal-header .tiktok-icon {
+            width: 40px; height: 40px; background: #000;
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 20px;
+        }
+
+        .modal-header div h3 { font-size: 16px; font-weight: 700; color: #1a1a1a; }
+        .modal-header div p { font-size: 13px; color: #888; }
+
+        .modal-body { padding: 24px; }
+
+        .modal-body .app-info {
+            display: flex; align-items: center; gap: 12px;
+            padding: 14px; background: #f5f5f5; border-radius: 10px; margin-bottom: 20px;
+        }
+
+        .modal-body .app-icon {
+            width: 44px; height: 44px; border-radius: 10px;
+            object-fit: cover; display: block;
+        }
+
+        .modal-body .app-info div h4 { font-size: 15px; font-weight: 700; color: #1a1a1a; }
+        .modal-body .app-info div p { font-size: 12px; color: #888; }
+
+        .modal-body .scope-list { margin: 16px 0; }
+
+        .modal-body .scope-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 0; border-bottom: 1px solid #eee;
+            font-size: 14px; color: #333;
+        }
+
+        .modal-body .scope-item:last-child { border-bottom: none; }
+
+        .scope-check { color: var(--accent); font-size: 18px; font-weight: 700; }
+
+        .modal-footer {
+            padding: 16px 24px 24px; display: flex; gap: 12px;
+        }
+
+        .modal-footer button {
+            flex: 1; padding: 12px; border-radius: 10px;
+            font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700;
+            border: none; cursor: pointer; transition: all 0.2s;
+        }
+
+        .btn-modal-cancel { background: #f0f0f0; color: #666; }
+        .btn-modal-authorize { background: var(--tiktok); color: #fff; }
+        .btn-modal-authorize:hover { filter: brightness(1.1); }
+
+        /* ── PUBLISH SUCCESS MODAL ── */
+        .success-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center; z-index: 100;
+        }
+
+        .success-overlay.show { display: flex; }
+
+        .success-modal {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 20px; padding: 40px; text-align: center;
+            width: 400px; max-width: 90vw; animation: scaleIn 0.3s ease;
+        }
+
+        .success-icon {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: var(--accent-dim); color: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; margin: 0 auto 20px;
+        }
+
+        .success-modal h3 { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+        .success-modal p { color: var(--text-secondary); font-size: 14px; margin-bottom: 8px; }
+
+        .success-modal .publish-id {
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            color: var(--text-muted); background: var(--bg-elevated);
+            padding: 6px 12px; border-radius: 6px; display: inline-block; margin: 12px 0 24px;
+        }
+
+        /* ── LOADING BAR ── */
+        .loading-bar {
+            width: 100%; height: 4px; background: var(--bg-elevated);
+            border-radius: 2px; overflow: hidden; margin: 16px 0; display: none;
+        }
+
+        .loading-bar.active { display: block; }
+
+        .loading-bar-fill {
+            height: 100%; width: 0%; border-radius: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--blue));
+            transition: width 0.5s ease;
+        }
+
+        /* ── ANIMATIONS ── */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .view { animation: fadeIn 0.3s ease; }
+        .hidden { display: none !important; }
+        .loading { animation: pulse 1.5s infinite; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+
+    <!-- ═══ SIDEBAR ═══ -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img class="icon" src="./logolumix.png" alt="Lumix Social Manager">
+            <span>Lumix Social Manager</span>
+        </div>
+
+        <div class="nav-label">Manage</div>
+        <div class="nav-item active" onclick="go('dashboard')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Dashboard
+        </div>
+        <div class="nav-item" onclick="go('publish')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Publish
+        </div>
+        <div class="nav-item" onclick="go('history')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            History
+        </div>
+
+        <div class="nav-label">Settings</div>
+        <div class="nav-item" onclick="go('accounts')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            Accounts
+        </div>
+
+        <div class="sidebar-footer">
+            <p>Lumix Social Manager v1.0</p>
+            <p style="margin-top:4px;">© 2026 Lumix Agency</p>
+        </div>
+    </aside>
+
+    <!-- ═══ MAIN ═══ -->
+    <main class="main">
+
+        <!-- VIEW: CONNECT -->
+        <div id="v-connect" class="view">
+            <div class="connect-screen">
+                <div class="connect-icon">♪</div>
+                <h2>Connect your TikTok</h2>
+                <p>Link your TikTok account to start publishing content directly from Lumix Social Manager.</p>
+                <button class="btn btn-tiktok" onclick="openOAuth()">
+                    ♪ &nbsp; Connect with TikTok
+                </button>
+                <p style="font-size:12px; color:var(--text-muted); margin-top:16px;">
+                    Permissions: profile info · video publish · video upload
+                </p>
+            </div>
+        </div>
+
+        <!-- VIEW: DASHBOARD -->
+        <div id="v-dashboard" class="view hidden">
+            <div class="page-header">
+                <h1>Dashboard</h1>
+                <p>Manage your connected TikTok account</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">♪ &nbsp; Connected Account</div>
+                <div class="creator-profile">
+                    <div class="creator-avatar">LS</div>
+                    <div class="creator-info">
+                        <h3>Lumix Social Demo</h3>
+                        <p>@lumixsocialdemo</p>
+                    </div>
+                    <span class="creator-badge">✓ Connected</span>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-primary" onclick="go('publish')">+ New Post</button>
+                    <button class="btn btn-outline btn-sm" onclick="go('history')">View History</button>
+                    <button class="btn btn-danger btn-sm" onclick="disconnect()">Disconnect</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Creator Capabilities</div>
+                <div class="config-row">
+                    <span class="config-label">Max Video Duration</span>
+                    <span class="config-value">600 seconds</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Privacy Options</span>
+                    <span class="config-value">PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, SELF_ONLY</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Comments</span>
+                    <span class="config-value">Enabled</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Duet</span>
+                    <span class="config-value">Enabled</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Stitch</span>
+                    <span class="config-value">Enabled</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: PUBLISH -->
+        <div id="v-publish" class="view hidden">
+            <div class="page-header">
+                <h1>Publish to TikTok</h1>
+                <p>Upload and publish content to the connected account</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Video Upload</div>
+                <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                    <span class="icon-upload">↑</span>
+                    <p id="upload-label">Click to select a video file<br><span style="font-size:12px;color:var(--text-muted)">MP4 (H.264) · Max 4GB · 3–600 seconds</span></p>
+                </div>
+                <input type="file" id="file-input" accept="video/mp4" style="display:none" onchange="pickFile(event)">
+            </div>
+
+            <div class="card">
+                <div class="card-title">Post Settings</div>
+
+                <div class="form-group">
+                    <label>Caption</label>
+                    <textarea id="caption" placeholder="Write a caption for your video... #hashtags @mentions" maxlength="2200" oninput="countChars()">Check out our latest product! 🔥 #demo #lumixsocial #fyp</textarea>
+                    <p class="hint"><span id="char-count">55</span>/2200</p>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                    <div class="form-group">
+                        <label>Privacy Level</label>
+                        <select id="privacy">
+                            <option value="PUBLIC_TO_EVERYONE">Public to Everyone</option>
+                            <option value="MUTUAL_FOLLOW_FRIENDS">Friends Only</option>
+                            <option value="SELF_ONLY">Only Me</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Cover Timestamp (ms)</label>
+                        <input type="number" value="1000" id="cover-ts">
+                        <p class="hint">Video frame for thumbnail</p>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+                    <div class="form-group">
+                        <label>Comments</label>
+                        <select><option>Enabled</option><option>Disabled</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Duet</label>
+                        <select><option>Enabled</option><option>Disabled</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Stitch</label>
+                        <select><option>Enabled</option><option>Disabled</option></select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading-bar" id="loading-bar">
+                <div class="loading-bar-fill" id="loading-fill"></div>
+            </div>
+
+            <div style="display:flex; gap:12px; margin-top:4px;">
+                <button class="btn btn-primary" id="btn-publish" onclick="simulatePublish('direct')" disabled>
+                    ▸ Publish Now (Direct Post)
+                </button>
+                <button class="btn btn-outline" id="btn-draft" onclick="simulatePublish('draft')" disabled>
+                    📥 Send as Draft (Inbox)
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW: HISTORY -->
+        <div id="v-history" class="view hidden">
+            <div class="page-header">
+                <h1>Publish History</h1>
+                <p>Track the status of published content</p>
+            </div>
+
+            <div class="card" id="history-list">
+                <div class="log-entry">
+                    <span class="log-time">14:22</span>
+                    <span class="status status-success"><span class="status-dot"></span> Published</span>
+                    <span>Summer promo video 🔥 — PUBLIC</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">13:05</span>
+                    <span class="status status-success"><span class="status-dot"></span> Published</span>
+                    <span>Product launch teaser — PUBLIC</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">10:30</span>
+                    <span class="status status-pending"><span class="status-dot"></span> Draft Sent</span>
+                    <span>Behind the scenes clip — INBOX</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: ACCOUNTS -->
+        <div id="v-accounts" class="view hidden">
+            <div class="page-header">
+                <h1>Connected Accounts</h1>
+                <p>Manage TikTok accounts linked to your workspace</p>
+            </div>
+
+            <div class="card">
+                <div class="creator-profile">
+                    <div class="creator-avatar">LS</div>
+                    <div class="creator-info">
+                        <h3>Lumix Social Demo</h3>
+                        <p>@lumixsocialdemo · Connected via OAuth 2.0</p>
+                    </div>
+                    <span class="creator-badge">✓ Active</span>
+                </div>
+            </div>
+
+            <button class="btn btn-tiktok" onclick="openOAuth()" style="margin-top:12px;">
+                + Connect Another Account
+            </button>
+        </div>
+
+    </main>
+</div>
+
+<!-- ═══ OAUTH MODAL ═══ -->
+<div class="modal-overlay" id="oauth-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="tiktok-icon">♪</div>
+            <div>
+                <h3>TikTok Authorization</h3>
+                <p>oauth.tiktok.com</p>
+            </div>
+        </div>
+        <div class="modal-body">
+            <div class="app-info">
+                <img class="app-icon" src="./logolumix.png" alt="Lumix Social Manager">
+                <div>
+                    <h4>Lumix Social Manager</h4>
+                    <p>by Lumix Agency · lumixagencia.com</p>
+                </div>
+            </div>
+
+            <p style="font-size:14px; font-weight:600; color:#333; margin-bottom:4px;">This app would like to:</p>
+
+            <div class="scope-list">
+                <div class="scope-item">
+                    <span class="scope-check">✓</span>
+                    <span>Access your basic profile information (user.info.basic)</span>
+                </div>
+                <div class="scope-item">
+                    <span class="scope-check">✓</span>
+                    <span>Publish videos to your TikTok account (video.publish)</span>
+                </div>
+                <div class="scope-item">
+                    <span class="scope-check">✓</span>
+                    <span>Upload videos to your TikTok inbox (video.upload)</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-modal-cancel" onclick="closeOAuth()">Cancel</button>
+            <button class="btn-modal-authorize" onclick="authorize()">Authorize App</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ SUCCESS MODAL ═══ -->
+<div class="success-overlay" id="success-modal">
+    <div class="success-modal">
+        <div class="success-icon">✓</div>
+        <h3 id="success-title">Published Successfully!</h3>
+        <p id="success-desc">Your video has been posted to TikTok.</p>
+        <div class="publish-id" id="success-id">publish_id: v_pub_a1b2c3d4e5</div>
+        <button class="btn btn-primary" onclick="closeSuccess()">Done</button>
+    </div>
+</div>
+
+<!-- ═══ SCRIPT ═══ -->
+<script>
+    let connected = false;
+    let fileSelected = false;
+
+    function go(view) {
+        document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+
+        if (!connected && view !== 'connect') {
+            document.getElementById('v-connect').classList.remove('hidden');
+            updateNav(-1);
+            return;
+        }
+
+        document.getElementById('v-' + view).classList.remove('hidden');
+
+        const map = { dashboard: 0, publish: 1, history: 2, accounts: 3 };
+        updateNav(map[view] ?? -1);
+    }
+
+    function updateNav(idx) {
+        document.querySelectorAll('.nav-item').forEach((item, i) => {
+            item.classList.toggle('active', i === idx);
+        });
+    }
+
+    // ── OAuth Flow ──
+    function openOAuth() {
+        document.getElementById('oauth-modal').classList.add('show');
+    }
+
+    function closeOAuth() {
+        document.getElementById('oauth-modal').classList.remove('show');
+    }
+
+    function authorize() {
+        closeOAuth();
+        connected = true;
+        go('dashboard');
+    }
+
+    function disconnect() {
+        if (!confirm('Disconnect this TikTok account?')) return;
+        connected = false;
+        go('connect');
+    }
+
+    // ── File Upload ──
+    function pickFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        fileSelected = true;
+
+        const area = document.getElementById('upload-area');
+        area.classList.add('has-file');
+        document.getElementById('upload-label').innerHTML =
+            '<span class="file-name">' + file.name + '</span><br>' +
+            '<span style="font-size:12px;color:var(--text-muted)">' + (file.size / 1024 / 1024).toFixed(1) + ' MB · MP4</span>';
+
+        document.getElementById('btn-publish').disabled = false;
+        document.getElementById('btn-draft').disabled = false;
+    }
+
+    // ── Caption Counter ──
+    function countChars() {
+        document.getElementById('char-count').textContent = document.getElementById('caption').value.length;
+    }
+
+    // ── Simulate Publish ──
+    function simulatePublish(mode) {
+        const bar = document.getElementById('loading-bar');
+        const fill = document.getElementById('loading-fill');
+
+        bar.classList.add('active');
+        fill.style.width = '0%';
+
+        document.getElementById('btn-publish').disabled = true;
+        document.getElementById('btn-draft').disabled = true;
+
+        // Step 1: Init
+        setTimeout(() => { fill.style.width = '20%'; }, 300);
+        // Step 2: Uploading
+        setTimeout(() => { fill.style.width = '50%'; }, 1000);
+        // Step 3: Processing
+        setTimeout(() => { fill.style.width = '80%'; }, 2000);
+        // Step 4: Complete
+        setTimeout(() => {
+            fill.style.width = '100%';
+
+            setTimeout(() => {
+                bar.classList.remove('active');
+                fill.style.width = '0%';
+                document.getElementById('btn-publish').disabled = false;
+                document.getElementById('btn-draft').disabled = false;
+
+                // Show success
+                const id = 'v_pub_' + Math.random().toString(36).substring(2, 10);
+                document.getElementById('success-id').textContent = 'publish_id: ' + id;
+
+                if (mode === 'direct') {
+                    document.getElementById('success-title').textContent = 'Published Successfully!';
+                    document.getElementById('success-desc').textContent = 'Your video has been posted directly to TikTok.';
+                } else {
+                    document.getElementById('success-title').textContent = 'Draft Sent to Inbox!';
+                    document.getElementById('success-desc').textContent = 'Your video was sent to the creator\'s TikTok inbox for review.';
+                }
+
+                document.getElementById('success-modal').classList.add('show');
+
+                // Add to history
+                addHistory(mode);
+            }, 400);
+        }, 2800);
+    }
+
+    function addHistory(mode) {
+        const now = new Date();
+        const time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        const caption = document.getElementById('caption').value.substring(0, 35);
+        const privacy = document.getElementById('privacy').value.replace(/_/g, ' ');
+        const statusClass = mode === 'direct' ? 'status-success' : 'status-pending';
+        const statusText = mode === 'direct' ? 'Published' : 'Draft Sent';
+
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML =
+            '<span class="log-time">' + time + '</span>' +
+            '<span class="status ' + statusClass + '"><span class="status-dot"></span> ' + statusText + '</span>' +
+            '<span>' + caption + '… — ' + privacy + '</span>';
+
+        const list = document.getElementById('history-list');
+        list.insertBefore(entry, list.firstChild);
+    }
+
+    function closeSuccess() {
+        document.getElementById('success-modal').classList.remove('show');
+    }
+
+    // Init
+    go('connect');
+    countChars();
+</script>
+
+</body>
+</html>
