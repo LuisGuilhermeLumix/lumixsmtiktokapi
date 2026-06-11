@@ -1,6 +1,7 @@
 export const TIKTOK_AUTHORIZE_URL = "https://www.tiktok.com/v2/auth/authorize/";
 export const TIKTOK_API_BASE = "https://open.tiktokapis.com";
 export const TIKTOK_TOKEN_URL = `${TIKTOK_API_BASE}/v2/oauth/token/`;
+export const TIKTOK_REVOKE_URL = `${TIKTOK_API_BASE}/v2/oauth/revoke/`;
 
 export const TIKTOK_SCOPES = [
   "user.info.basic",

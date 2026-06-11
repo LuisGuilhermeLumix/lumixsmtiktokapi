@@ -1,5 +1,11 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { TIKTOK_AUTHORIZE_URL, TIKTOK_TOKEN_URL, TIKTOK_SCOPES, type TikTokScope } from "./constants.js";
+import {
+  TIKTOK_AUTHORIZE_URL,
+  TIKTOK_REVOKE_URL,
+  TIKTOK_TOKEN_URL,
+  TIKTOK_SCOPES,
+  type TikTokScope,
+} from "./constants.js";
 import { TikTokApiError } from "./errors.js";
 import type { TikTokTokens } from "./types.js";
 
@@ -136,4 +142,41 @@ export function refreshToken(
     grant_type: "refresh_token",
     refresh_token: refreshTokenValue,
   });
+}
+
+/**
+ * Revoga o access token no TikTok (/v2/oauth/revoke/) — invalida o
+ * acesso do lado deles. Usado ao desconectar uma conta no painel.
+ */
+export async function revokeToken(
+  config: TikTokOAuthConfig,
+  accessToken: string,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(TIKTOK_REVOKE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_key: config.clientKey,
+        client_secret: config.clientSecret,
+        token: accessToken,
+      }),
+    });
+  } catch (err) {
+    throw new TikTokApiError({
+      kind: "network",
+      code: "network_error",
+      message: `Falha de rede no revoke: ${String(err)}`,
+    });
+  }
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as RawTokenResponse | null;
+    throw new TikTokApiError({
+      code: json?.error ?? `http_${res.status}`,
+      message: json?.error_description ?? `Revoke falhou (HTTP ${res.status})`,
+      httpStatus: res.status,
+      logId: json?.log_id,
+    });
+  }
 }

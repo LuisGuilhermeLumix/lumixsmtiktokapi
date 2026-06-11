@@ -6,7 +6,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type { Client, SocialAccount } from "@/lib/types";
-import { Banner, Button, Card, EmptyState, Spinner } from "@/components/ui";
+import { Banner, Button, Card, EmptyState, Modal, Spinner } from "@/components/ui";
 import { StatusBadge } from "@/components/status-badge";
 
 export default function ClientDetailPage() {
@@ -18,6 +18,8 @@ export default function ClientDetailPage() {
   const [accounts, setAccounts] = useState<SocialAccount[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [toDisconnect, setToDisconnect] = useState<SocialAccount | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const load = useCallback(() => {
     apiFetch<{ clients: Client[] }>("/clients")
@@ -29,6 +31,21 @@ export default function ClientDetailPage() {
   }, [id]);
 
   useEffect(load, [load]);
+
+  async function disconnect() {
+    if (!toDisconnect) return;
+    setDisconnecting(true);
+    try {
+      await apiFetch(`/clients/${id}/accounts/${toDisconnect.id}`, { method: "DELETE" });
+      setToDisconnect(null);
+      load();
+    } catch (err) {
+      setError((err as Error).message);
+      setToDisconnect(null);
+    } finally {
+      setDisconnecting(false);
+    }
+  }
 
   async function connectTikTok() {
     setConnecting(true);
@@ -106,7 +123,11 @@ export default function ClientDetailPage() {
                   </p>
                 </div>
                 <StatusBadge status={a.status} />
-                {a.status !== "connected" && (
+                {a.status === "connected" ? (
+                  <Button variant="danger" onClick={() => setToDisconnect(a)}>
+                    Desconectar
+                  </Button>
+                ) : (
                   <Button variant="secondary" onClick={connectTikTok}>
                     Reconectar
                   </Button>
@@ -116,6 +137,30 @@ export default function ClientDetailPage() {
           </ul>
         )}
       </Card>
+
+      <Modal
+        open={toDisconnect !== null}
+        onClose={() => setToDisconnect(null)}
+        title="Desconectar conta TikTok"
+      >
+        <p className="text-sm text-ink-dim">
+          Tem certeza que deseja desconectar{" "}
+          <strong className="text-ink">
+            {toDisconnect?.display_name ?? "esta conta"}
+          </strong>
+          ? Isso revoga o acesso no TikTok e os tokens são apagados
+          permanentemente. O histórico de posts é mantido, mas novas
+          publicações e coletas de métricas param até reconectar.
+        </p>
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => setToDisconnect(null)}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={disconnect} disabled={disconnecting}>
+            {disconnecting ? <Spinner /> : "Desconectar"}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
