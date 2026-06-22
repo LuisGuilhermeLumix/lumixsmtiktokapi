@@ -29,6 +29,11 @@ const envSchema = z.object({
   CREDIT_MARKUP: z.coerce.number().positive().default(1.3),
   /** timezone p/ casar os horários (post_times) das automações */
   AUTOMATION_TZ: z.string().default("America/Sao_Paulo"),
+  /** callback das cenas kie (motor): URL pública da API + segredo */
+  API_PUBLIC_URL: z.string().url().optional(),
+  KIE_CALLBACK_SECRET: z.string().optional(),
+  /** limites de escala (Fase 5) */
+  MAX_INFLIGHT_PER_ORG: z.coerce.number().int().min(1).default(20),
 });
 
 export type WorkerConfig = z.infer<typeof envSchema>;

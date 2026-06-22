@@ -5,7 +5,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { GENERATION_KINDS } from "@lsm/shared";
+import { GENERATION_KINDS, toBullJobId } from "@lsm/shared";
 import { creditsForModel, kieCreateTask, kieRecordInfo, KieError } from "@lsm/shared/kie";
 import { mhCreateVideo, mhGetVideo, MagicHourError } from "@lsm/shared/magichour";
 import type { Json, Tables } from "@lsm/db";
@@ -385,6 +385,19 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
         .eq("kie_task_id", taskId)
         .maybeSingle();
       if (!gen || (gen.status !== "queued" && gen.status !== "processing")) {
+        // pode ser uma CENA do motor de automações → avança via scene-poll
+        const { data: scene } = await deps.db
+          .from("automation_scenes")
+          .select("id, status")
+          .eq("provider_task_id", taskId)
+          .maybeSingle();
+        if (scene && (scene.status === "video" || scene.status === "queued")) {
+          await deps.queues.scenePoll.add(
+            "poll",
+            { sceneId: scene.id, attempt: 0 },
+            { jobId: toBullJobId(`poll:${scene.id}:cb`) },
+          );
+        }
         return reply.code(200).send({ ok: true });
       }
 

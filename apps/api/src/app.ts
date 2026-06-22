@@ -16,11 +16,13 @@ import { createAuthHooks } from "./lib/auth.js";
 import { HttpError } from "./lib/errors.js";
 import { registerAnalyticsRoutes } from "./routes/analytics.js";
 import { registerApiKeyRoutes } from "./routes/apikeys.js";
+import { registerAutomationRoutes } from "./routes/automation.js";
 import { registerAuthTikTokRoutes } from "./routes/auth-tiktok.js";
 import { registerClientRoutes } from "./routes/clients.js";
 import { registerContentRoutes } from "./routes/content.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerPostRoutes } from "./routes/posts.js";
+import { registerWorkflowRoutes } from "./routes/workflows.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
@@ -79,6 +81,7 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
         { name: "posts", description: "Publicações" },
         { name: "analytics", description: "Métricas" },
         { name: "studio", description: "Estúdio de Conteúdo IA (kie.ai)" },
+        { name: "automation", description: "Motor de automações (niche packs, personagens)" },
         { name: "settings", description: "API keys e configurações" },
         { name: "webhooks", description: "Integração n8n e kie.ai" },
         { name: "infra", description: "Healthcheck" },
@@ -124,6 +127,8 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
   registerPostRoutes(app, deps, auth);
   registerAnalyticsRoutes(app, deps, auth);
   registerApiKeyRoutes(app, deps, auth);
+  registerAutomationRoutes(app, deps, auth);
+  registerWorkflowRoutes(app, deps, auth);
   registerContentRoutes(app, deps, auth);
   registerWebhookRoutes(app, deps);
 

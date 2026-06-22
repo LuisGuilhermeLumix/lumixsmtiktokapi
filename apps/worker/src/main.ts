@@ -7,19 +7,31 @@
 import { Worker } from "bullmq";
 import {
   QUEUE_ANALYTICS,
+  QUEUE_AUTO_PLAN,
+  QUEUE_AUTO_SCAN,
   QUEUE_AUTOMATION,
   QUEUE_PUBLISH,
+  QUEUE_SCENE_POLL,
+  QUEUE_SCENE_VIDEO,
+  QUEUE_SCRIPT_GEN,
   QUEUE_STATUS,
   QUEUE_TOKEN_REFRESH,
+  QUEUE_VIDEO_STITCH,
 } from "@lsm/shared";
 import { loadConfig } from "./config.js";
 import { closeDeps, createDeps } from "./deps.js";
 import { startHealthServer } from "./health.js";
 import { createAnalyticsProcessor } from "./processors/analytics.js";
 import { createAutomationProcessor } from "./processors/automation.js";
+import { createAutoPlanProcessor } from "./processors/auto-plan.js";
+import { createAutoScanProcessor } from "./processors/auto-scan.js";
 import { createPublishProcessor } from "./processors/publish.js";
+import { createScenePollProcessor } from "./processors/scene-poll.js";
+import { createSceneVideoProcessor } from "./processors/scene-video.js";
+import { createScriptGenProcessor } from "./processors/script-generate.js";
 import { createStatusProcessor } from "./processors/status.js";
 import { createTokenRefreshProcessor } from "./processors/token-refresh.js";
+import { createVideoStitchProcessor } from "./processors/video-stitch.js";
 
 async function main() {
   const config = loadConfig();
@@ -35,8 +47,25 @@ async function main() {
       connection,
       concurrency: 3,
     }),
-    // esteira de conteúdo IA: tick (scan) + pipelines (geração+publicação)
+    // esteira de conteúdo IA (legado simples): tick + pipeline
     new Worker(QUEUE_AUTOMATION, createAutomationProcessor(deps), { connection, concurrency: 2 }),
+    // motor de automações (jobs curtos e idempotentes)
+    new Worker(QUEUE_AUTO_SCAN, createAutoScanProcessor(deps), { connection, concurrency: 1 }),
+    new Worker(QUEUE_AUTO_PLAN, createAutoPlanProcessor(deps), { connection, concurrency: 3 }),
+    // rate-limit global por provider (Redis): LLM e criação de tasks na kie
+    new Worker(QUEUE_SCRIPT_GEN, createScriptGenProcessor(deps), {
+      connection,
+      concurrency: 4,
+      limiter: { max: 10, duration: 10_000 },
+    }),
+    new Worker(QUEUE_SCENE_VIDEO, createSceneVideoProcessor(deps), {
+      connection,
+      concurrency: 6,
+      limiter: { max: 18, duration: 10_000 },
+    }),
+    new Worker(QUEUE_SCENE_POLL, createScenePollProcessor(deps), { connection, concurrency: 8 }),
+    // FFmpeg: worker dedicado, concorrência baixa (CPU + memória)
+    new Worker(QUEUE_VIDEO_STITCH, createVideoStitchProcessor(deps), { connection, concurrency: 2 }),
   ];
 
   for (const worker of workers) {
@@ -64,6 +93,11 @@ async function main() {
   await deps.queues.automation.upsertJobScheduler(
     "automation-tick",
     { pattern: "* * * * *" }, // a cada minuto: varre automações e enfileira as devidas
+    { name: "scan", data: {} },
+  );
+  await deps.queues.autoScan.upsertJobScheduler(
+    "auto-scan-tick",
+    { pattern: "* * * * *" }, // motor: varre workflows e dispara runs (lead-time)
     { name: "scan", data: {} },
   );
 

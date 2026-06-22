@@ -2,6 +2,9 @@
 // (cripto AES-256-GCM é server-only: importar via "@lsm/shared/crypto")
 
 export * from "./queues.js";
+// tipos do motor de automações (type-only — os schemas zod ficam no subpath
+// @lsm/shared/automation para não puxar runtime no bundle principal)
+export type * from "./automation/types.js";
 
 export const LSM_PLATFORMS = ["tiktok"] as const;
 export type Platform = (typeof LSM_PLATFORMS)[number];
