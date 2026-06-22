@@ -18,9 +18,9 @@
       "types": "./dist/kie.d.ts",
       "import": "./dist/kie.js"
     },
-    "./fal": {
-      "types": "./dist/fal.d.ts",
-      "import": "./dist/fal.js"
+    "./magichour": {
+      "types": "./dist/magichour.d.ts",
+      "import": "./dist/magichour.js"
     }
   },
   "scripts": {

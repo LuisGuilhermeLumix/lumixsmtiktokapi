@@ -203,17 +203,9 @@ const MODEL_CREDITS: Record<string, number> = {
   "kling/v2": 54,
   "bytedance/seedance-v1-pro": 46,
   "minimax/hailuo-02": 50,
-  // ── fal.ai (imagem) ──
-  "fal-ai/flux/schnell": 2,
-  "fal-ai/flux/dev": 4,
-  // ── fal.ai (vídeo) ──
-  "fal-ai/kling-video/v2.1/standard/text-to-video": 40,
-  "fal-ai/kling-video/v2.1/pro/text-to-video": 80,
-  "fal-ai/veo3": 120,
-  "fal-ai/veo3/fast": 70,
-  "fal-ai/minimax/hailuo-02/standard/text-to-video": 45,
-  "fal-ai/luma-dream-machine": 50,
-  "fal-ai/wan-t2v": 35,
+  // ── Magic Hour (vídeo) ──
+  "kling-3.0": 50,
+  "kling-2.5": 40,
 };
 const PER_EXTRA_SECOND: Record<string, number> = { veo3_fast: 8, veo3: 14 };
 const BASE_DURATION = 4;

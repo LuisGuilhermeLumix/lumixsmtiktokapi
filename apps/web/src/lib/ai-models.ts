@@ -1,12 +1,12 @@
 // Catálogo de modelos de IA expostos no Estúdio de Conteúdo.
-// Providers: fal.ai (PRINCIPAL) e kie.ai (secundário — uso em produção).
+// Providers: Magic Hour (PRINCIPAL — vídeo) e kie.ai (secundário — produção).
 // `kieModel` = identificador enviado em POST /generations (campo `model`).
 // `backend`  = provider que processa (default kie). `credits` = custo JÁ EM
 //   CRÉDITOS LSM (custo do provider + markup). ⚠️ números PLACEHOLDER.
 
 export type AiKind = "image" | "video";
-/** backend de geração: kie.ai ou fal.ai */
-export type AiProvider = "kie" | "fal";
+/** backend de geração: Magic Hour (vídeo) ou kie.ai */
+export type AiProvider = "kie" | "magichour";
 
 export interface AiModel {
   id: string;
@@ -30,30 +30,7 @@ export interface AiModel {
 const ASPECTS = ["9:16", "1:1", "16:9"];
 
 export const AI_MODELS: AiModel[] = [
-  // ═════════ IMAGEM ═════════
-  // ── fal.ai (principal) ──
-  {
-    id: "fal-flux-schnell",
-    kieModel: "fal-ai/flux/schnell",
-    backend: "fal",
-    label: "Flux Schnell (fal)",
-    provider: "fal.ai · BFL",
-    kind: "image",
-    credits: 3,
-    aspectRatios: ASPECTS,
-    note: "Rápido e barato — ideal p/ cenas em lote.",
-  },
-  {
-    id: "fal-flux-dev",
-    kieModel: "fal-ai/flux/dev",
-    backend: "fal",
-    label: "Flux Dev (fal)",
-    provider: "fal.ai · BFL",
-    kind: "image",
-    credits: 5,
-    aspectRatios: ASPECTS,
-  },
-  // ── kie.ai (secundário / produção) ──
+  // ═════════ IMAGEM (kie.ai) ═════════
   {
     id: "nano-banana",
     kieModel: "google/nano-banana",
@@ -85,55 +62,30 @@ export const AI_MODELS: AiModel[] = [
   },
 
   // ═════════ VÍDEO ═════════
-  // ── fal.ai (principal) ──
+  // ── Magic Hour (principal) ──
   {
-    id: "fal-kling-21",
-    kieModel: "fal-ai/kling-video/v2.1/standard/text-to-video",
-    backend: "fal",
-    label: "Kling 2.1 Std (fal)",
-    provider: "fal.ai · Kuaishou",
+    id: "mh-kling-3",
+    kieModel: "kling-3.0",
+    backend: "magichour",
+    label: "Kling 3.0 (Magic Hour)",
+    provider: "Magic Hour · Kuaishou",
     kind: "video",
-    credits: 52,
+    credits: 50,
     durations: [5, 10],
     aspectRatios: ["9:16", "1:1", "16:9"],
     supportsImageInput: true,
-    note: "Bom custo-benefício.",
+    note: "Provider principal — vídeo com áudio.",
   },
   {
-    id: "fal-kling-21-pro",
-    kieModel: "fal-ai/kling-video/v2.1/pro/text-to-video",
-    backend: "fal",
-    label: "Kling 2.1 Pro (fal)",
-    provider: "fal.ai · Kuaishou",
+    id: "mh-kling-25",
+    kieModel: "kling-2.5",
+    backend: "magichour",
+    label: "Kling 2.5 (Magic Hour)",
+    provider: "Magic Hour · Kuaishou",
     kind: "video",
-    credits: 104,
+    credits: 40,
     durations: [5, 10],
     aspectRatios: ["9:16", "1:1", "16:9"],
-    supportsImageInput: true,
-  },
-  {
-    id: "fal-veo3-fast",
-    kieModel: "fal-ai/veo3/fast",
-    backend: "fal",
-    label: "Veo 3 Fast (fal)",
-    provider: "fal.ai · Google",
-    kind: "video",
-    credits: 91,
-    durations: [4, 6, 8],
-    aspectRatios: ["9:16", "16:9"],
-    supportsImageInput: true,
-    note: "Qualidade com áudio.",
-  },
-  {
-    id: "fal-hailuo",
-    kieModel: "fal-ai/minimax/hailuo-02/standard/text-to-video",
-    backend: "fal",
-    label: "Hailuo 02 (fal)",
-    provider: "fal.ai · MiniMax",
-    kind: "video",
-    credits: 59,
-    durations: [6, 10],
-    aspectRatios: ["9:16", "16:9"],
     supportsImageInput: true,
   },
   // ── kie.ai (secundário / produção) ──
