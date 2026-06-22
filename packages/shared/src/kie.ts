@@ -204,8 +204,12 @@ const MODEL_CREDITS: Record<string, number> = {
   "bytedance/seedance-v1-pro": 46,
   "minimax/hailuo-02": 50,
   // ── Magic Hour (vídeo) ──
-  "kling-3.0": 50,
+  default: 50,
+  "ltx-2": 35,
   "kling-2.5": 40,
+  "kling-3.0": 50,
+  "veo3.1": 120,
+  "sora-2": 140,
 };
 const PER_EXTRA_SECOND: Record<string, number> = { veo3_fast: 8, veo3: 14 };
 const BASE_DURATION = 4;

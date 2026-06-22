@@ -31,6 +31,9 @@ const envSchema = z.object({
   API_PUBLIC_URL: z.string().url().optional(),
   // Magic Hour — provider principal (vídeo). Opcional; sem ela dá 503.
   MAGICHOUR_API_KEY: z.string().optional(),
+  // resolução opcional (ex.: 480p). Sem valor = default do plano (tiers baixos
+  // não liberam 720p+). Defina só se seu plano permitir.
+  MAGICHOUR_RESOLUTION: z.string().optional(),
   // taxa de markup oculta sobre o custo do provider (1.3 = +30%)
   CREDIT_MARKUP: z.coerce.number().positive().default(1.3),
 

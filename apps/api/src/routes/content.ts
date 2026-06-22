@@ -165,7 +165,9 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
             prompt: b.prompt,
             endSeconds: b.duration ?? 5,
             aspectRatio: b.aspect_ratio ?? "9:16",
-            resolution: "720p",
+            // resolução opcional via env (tiers baixos não liberam 720p+);
+            // sem valor, a Magic Hour usa o default do modelo/plano
+            resolution: deps.config.MAGICHOUR_RESOLUTION,
             imageUrl: b.image_url,
           });
           taskId = sub.id;
