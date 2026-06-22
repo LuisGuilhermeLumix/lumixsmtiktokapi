@@ -1,33 +1,25 @@
-// Estúdio de Conteúdo IA — gerações (kie.ai / fal.ai), automações e créditos.
+// Estúdio de Conteúdo IA — gerações (Magic Hour / kie.ai), automações e créditos.
 // Cobrança = créditos LSM (custo do provider + markup). Geração avulsa usa
-// polling lazy no GET; webhooks /webhooks/kie e /webhooks/fal finalizam.
+// polling lazy no GET; webhook /webhooks/kie finaliza as gerações kie.
 
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { GENERATION_KINDS } from "@lsm/shared";
 import { creditsForModel, kieCreateTask, kieRecordInfo, KieError } from "@lsm/shared/kie";
-import { falSubmit, falPoll, FalError } from "@lsm/shared/fal";
+import { mhCreateVideo, mhGetVideo, MagicHourError } from "@lsm/shared/magichour";
 import type { Json, Tables } from "@lsm/db";
 import type { ApiDeps } from "../deps.js";
 import { assertClientAccess } from "../lib/access.js";
 import type { AuthHooks } from "../lib/auth.js";
 import { httpError } from "../lib/errors.js";
 
-type Provider = "kie" | "fal";
+type Provider = "kie" | "magichour";
 
-/** lê o provider e as URLs da fal salvas no input jsonb da geração */
-function readInputMeta(input: Json | null): {
-  provider: Provider;
-  statusUrl: string;
-  responseUrl: string;
-} {
+/** lê o provider salvo no input jsonb da geração */
+function readProvider(input: Json | null): Provider {
   const o = (input ?? {}) as Record<string, unknown>;
-  return {
-    provider: o.provider === "fal" ? "fal" : "kie",
-    statusUrl: typeof o._statusUrl === "string" ? o._statusUrl : "",
-    responseUrl: typeof o._responseUrl === "string" ? o._responseUrl : "",
-  };
+  return o.provider === "magichour" ? "magichour" : "kie";
 }
 
 function mapGeneration(g: Tables<"generations">) {
@@ -125,10 +117,10 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
       preHandler: [auth.authenticate],
       schema: {
         tags: ["studio"],
-        description: "Cria uma geração de imagem/vídeo via kie.ai ou fal.ai (debita créditos)",
+        description: "Cria uma geração de imagem/vídeo via Magic Hour ou kie.ai (debita créditos)",
         body: z.object({
           kind: z.enum(GENERATION_KINDS),
-          provider: z.enum(["kie", "fal"]).default("kie"),
+          provider: z.enum(["kie", "magichour"]).default("magichour"),
           model: z.string().min(1),
           model_id: z.string().optional(),
           prompt: z.string().min(1).max(5000),
@@ -142,9 +134,13 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
     async (req, reply) => {
       const b = req.body;
       const provider: Provider = b.provider;
-      const hasKey = provider === "fal" ? !!deps.config.FAL_KEY : !!deps.config.KIE_API_KEY;
+      if (provider === "magichour" && b.kind === "image") {
+        throw httpError(400, "Magic Hour gera vídeo; para imagem use o provider kie.");
+      }
+      const hasKey =
+        provider === "magichour" ? !!deps.config.MAGICHOUR_API_KEY : !!deps.config.KIE_API_KEY;
       if (!hasKey) {
-        const envName = provider === "fal" ? "FAL_KEY" : "KIE_API_KEY";
+        const envName = provider === "magichour" ? "MAGICHOUR_API_KEY" : "KIE_API_KEY";
         throw httpError(503, `Estúdio IA indisponível: configure ${envName} na API.`);
       }
       if (b.client_id) await assertClientAccess(deps, req.auth!, b.client_id);
@@ -160,26 +156,19 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
       if (b.aspect_ratio) input.aspect_ratio = b.aspect_ratio;
       if (b.kind === "video" && b.duration) input.duration = b.duration;
       if (b.image_url) input.image_url = b.image_url;
-      // fal: modelos de imagem (Flux) usam `image_size` em vez de aspect_ratio
-      if (provider === "fal" && b.kind === "image") {
-        const sizeMap: Record<string, string> = {
-          "9:16": "portrait_16_9",
-          "16:9": "landscape_16_9",
-          "1:1": "square_hd",
-        };
-        input.image_size = sizeMap[b.aspect_ratio ?? "9:16"] ?? "portrait_16_9";
-      }
 
       let taskId: string;
       try {
-        if (provider === "fal") {
-          const webhook = deps.config.API_PUBLIC_URL
-            ? `${deps.config.API_PUBLIC_URL}/webhooks/fal`
-            : undefined;
-          const sub = await falSubmit(deps.config.FAL_KEY!, b.model, input, webhook);
-          taskId = sub.requestId;
-          input._statusUrl = sub.statusUrl;
-          input._responseUrl = sub.responseUrl;
+        if (provider === "magichour") {
+          const sub = await mhCreateVideo(deps.config.MAGICHOUR_API_KEY!, {
+            model: b.model,
+            prompt: b.prompt,
+            endSeconds: b.duration ?? 5,
+            aspectRatio: b.aspect_ratio ?? "9:16",
+            resolution: "720p",
+            imageUrl: b.image_url,
+          });
+          taskId = sub.id;
         } else {
           const callBackUrl = deps.config.API_PUBLIC_URL
             ? `${deps.config.API_PUBLIC_URL}/webhooks/kie` +
@@ -194,7 +183,7 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
       } catch (err) {
         await refundCredits(deps, req.auth!.orgId, cost);
         const status =
-          err instanceof KieError || err instanceof FalError ? err.status || 502 : 502;
+          err instanceof KieError || err instanceof MagicHourError ? err.status || 502 : 502;
         throw httpError(status, `${provider}: ${(err as Error).message}`);
       }
       input.provider = provider;
@@ -271,16 +260,14 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
       if (!gen || gen.org_id !== req.auth!.orgId) throw httpError(404, "Geração não encontrada");
 
       const pending = gen.status === "queued" || gen.status === "processing";
-      const meta = readInputMeta(gen.input);
+      const provider = readProvider(gen.input);
       const canPoll =
-        meta.provider === "fal"
-          ? !!deps.config.FAL_KEY && !!meta.statusUrl && !!meta.responseUrl
-          : !!deps.config.KIE_API_KEY;
+        provider === "magichour" ? !!deps.config.MAGICHOUR_API_KEY : !!deps.config.KIE_API_KEY;
       if (pending && gen.kie_task_id && canPoll) {
         try {
           const rec =
-            meta.provider === "fal"
-              ? await falPoll(deps.config.FAL_KEY!, meta.statusUrl, meta.responseUrl)
+            provider === "magichour"
+              ? await mhGetVideo(deps.config.MAGICHOUR_API_KEY!, gen.kie_task_id)
               : await kieRecordInfo(deps.config.KIE_API_KEY!, gen.kie_task_id);
           if (rec.status === "done" && rec.resultUrl) {
             const { data: upd } = await deps.db
@@ -402,49 +389,6 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
       if (!deps.config.KIE_API_KEY) return reply.code(200).send({ ok: true });
       try {
         const rec = await kieRecordInfo(deps.config.KIE_API_KEY, taskId);
-        if (rec.status === "done" && rec.resultUrl) {
-          await deps.db
-            .from("generations")
-            .update({ status: "done", result_url: rec.resultUrl, error: null })
-            .eq("id", gen.id);
-        } else if (rec.status === "failed") {
-          await refundCredits(deps, gen.org_id, gen.credits_charged, gen.id);
-          await deps.db
-            .from("generations")
-            .update({ status: "failed", error: rec.error })
-            .eq("id", gen.id);
-        }
-      } catch {
-        /* o polling lazy do GET resolve depois */
-      }
-      return reply.code(200).send({ ok: true });
-    },
-  );
-
-  // ───────────── webhook fal.ai (público) ─────────────
-  app.post(
-    "/webhooks/fal",
-    { schema: { tags: ["webhooks"], description: "Callback de conclusão da fal.ai" } },
-    async (req, reply) => {
-      const body = req.body as { request_id?: string } | undefined;
-      const requestId = body?.request_id;
-      if (!requestId) return reply.code(200).send({ ok: true });
-
-      const { data: gen } = await deps.db
-        .from("generations")
-        .select("*")
-        .eq("kie_task_id", requestId)
-        .maybeSingle();
-      if (!gen || (gen.status !== "queued" && gen.status !== "processing")) {
-        return reply.code(200).send({ ok: true });
-      }
-
-      const meta = readInputMeta(gen.input);
-      if (!deps.config.FAL_KEY || !meta.statusUrl || !meta.responseUrl) {
-        return reply.code(200).send({ ok: true });
-      }
-      try {
-        const rec = await falPoll(deps.config.FAL_KEY, meta.statusUrl, meta.responseUrl);
         if (rec.status === "done" && rec.resultUrl) {
           await deps.db
             .from("generations")

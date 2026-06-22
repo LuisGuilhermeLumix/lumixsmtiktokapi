@@ -311,8 +311,10 @@ function AutomacaoTab() {
   const [niche, setNiche] = useState("");
   const [perDay, setPerDay] = useState(2);
   const [duration, setDuration] = useState(8);
+  // esteira roda no worker (kie); default p/ modelos kie (produção)
+  const firstKieVideo = VIDEO_MODELS.find((m) => !m.backend) ?? VIDEO_MODELS[0];
   const [imageModelId, setImageModelId] = useState(IMAGE_MODELS[0].id);
-  const [videoModelId, setVideoModelId] = useState(VIDEO_MODELS[0].id);
+  const [videoModelId, setVideoModelId] = useState(firstKieVideo.id);
   const [scenePrompt, setScenePrompt] = useState(
     "Você é um diretor de arte. Gere prompts visuais detalhados (em inglês) para cada cena do roteiro, mantendo consistência de personagem, iluminação e estilo do nicho.",
   );

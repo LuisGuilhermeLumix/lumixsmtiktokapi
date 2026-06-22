@@ -29,8 +29,8 @@ const envSchema = z.object({
   KIE_API_KEY: z.string().optional(),
   KIE_CALLBACK_SECRET: z.string().optional(),
   API_PUBLIC_URL: z.string().url().optional(),
-  // fal.ai — segundo provider (vídeo). Opcional; sem ela, provider=fal dá 503.
-  FAL_KEY: z.string().optional(),
+  // Magic Hour — provider principal (vídeo). Opcional; sem ela dá 503.
+  MAGICHOUR_API_KEY: z.string().optional(),
   // taxa de markup oculta sobre o custo do provider (1.3 = +30%)
   CREDIT_MARKUP: z.coerce.number().positive().default(1.3),
 

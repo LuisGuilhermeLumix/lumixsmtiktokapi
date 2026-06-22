@@ -24,7 +24,7 @@ const envSchema = z.object({
 
   // Estúdio de Conteúdo IA — esteira de automação no worker.
   KIE_API_KEY: z.string().optional(),
-  FAL_KEY: z.string().optional(),
+  MAGICHOUR_API_KEY: z.string().optional(),
   KIE_LLM_MODEL: z.string().default("google/gemini-2.5-flash"),
   CREDIT_MARKUP: z.coerce.number().positive().default(1.3),
   /** timezone p/ casar os horários (post_times) das automações */
