@@ -60,9 +60,29 @@ export default function StudioPage() {
             Gere imagens e vídeos com IA, monte uma esteira automática e publique no TikTok.
           </p>
         </div>
-        <div className="glass rounded-lg px-4 py-2 text-right">
-          <p className="text-xs uppercase tracking-wide text-ink-faint">Créditos</p>
-          <p className="text-lg font-bold text-gradient">{credits ?? "—"}</p>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/studio/automations"
+            className="rounded-lg border border-border-subtle px-3 py-2 text-sm text-ink-dim hover:text-ink"
+          >
+            Automações
+          </Link>
+          <Link
+            href="/studio/niche-packs"
+            className="rounded-lg border border-border-subtle px-3 py-2 text-sm text-ink-dim hover:text-ink"
+          >
+            Niche Packs
+          </Link>
+          <Link
+            href="/studio/characters"
+            className="rounded-lg border border-border-subtle px-3 py-2 text-sm text-ink-dim hover:text-ink"
+          >
+            Personagens
+          </Link>
+          <div className="glass rounded-lg px-4 py-2 text-right">
+            <p className="text-xs uppercase tracking-wide text-ink-faint">Créditos</p>
+            <p className="text-lg font-bold text-gradient">{credits ?? "—"}</p>
+          </div>
         </div>
       </div>
 

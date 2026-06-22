@@ -21,6 +21,14 @@
     "./magichour": {
       "types": "./dist/magichour.d.ts",
       "import": "./dist/magichour.js"
+    },
+    "./automation": {
+      "types": "./dist/automation/index.d.ts",
+      "import": "./dist/automation/index.js"
+    },
+    "./niche": {
+      "types": "./dist/niche.d.ts",
+      "import": "./dist/niche.js"
     }
   },
   "scripts": {

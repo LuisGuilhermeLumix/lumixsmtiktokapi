@@ -25,6 +25,8 @@ RUN pnpm --filter @lsm/worker deploy --prod /out
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+# FFmpeg + ffprobe p/ a montagem multi-cena (auto-ffmpeg)
+RUN apk add --no-cache ffmpeg
 COPY --from=builder /out .
 
 # healthcheck HTTP próprio do worker (HEALTH_PORT)

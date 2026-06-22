@@ -3,15 +3,27 @@ import { Redis } from "ioredis";
 import { createServiceClient, type Db } from "@lsm/db";
 import {
   QUEUE_ANALYTICS,
+  QUEUE_AUTO_PLAN,
+  QUEUE_AUTO_SCAN,
   QUEUE_AUTOMATION,
   QUEUE_PUBLISH,
+  QUEUE_SCENE_POLL,
+  QUEUE_SCENE_VIDEO,
+  QUEUE_SCRIPT_GEN,
   QUEUE_STATUS,
   QUEUE_TOKEN_REFRESH,
+  QUEUE_VIDEO_STITCH,
   type AnalyticsJobData,
   type AutomationJobData,
+  type AutoPlanJobData,
+  type AutoScanJobData,
   type PublishJobData,
+  type ScenePollJobData,
+  type SceneVideoJobData,
+  type ScriptGenJobData,
   type StatusJobData,
   type TokenRefreshJobData,
+  type VideoStitchJobData,
 } from "@lsm/shared";
 import type { TikTokOAuthConfig } from "@lsm/tiktok";
 import type { WorkerConfig } from "./config.js";
@@ -27,6 +39,13 @@ export interface WorkerDeps {
     analytics: Queue<AnalyticsJobData>;
     tokenRefresh: Queue<TokenRefreshJobData>;
     automation: Queue<AutomationJobData>;
+    // motor de automações
+    autoScan: Queue<AutoScanJobData>;
+    autoPlan: Queue<AutoPlanJobData>;
+    scriptGen: Queue<ScriptGenJobData>;
+    sceneVideo: Queue<SceneVideoJobData>;
+    scenePoll: Queue<ScenePollJobData>;
+    videoStitch: Queue<VideoStitchJobData>;
   };
 }
 
@@ -66,6 +85,15 @@ export function createDeps(config: WorkerConfig): WorkerDeps {
         connection: redis,
         defaultJobOptions,
       }),
+      autoScan: new Queue<AutoScanJobData>(QUEUE_AUTO_SCAN, { connection: redis, defaultJobOptions }),
+      autoPlan: new Queue<AutoPlanJobData>(QUEUE_AUTO_PLAN, { connection: redis, defaultJobOptions }),
+      scriptGen: new Queue<ScriptGenJobData>(QUEUE_SCRIPT_GEN, { connection: redis, defaultJobOptions }),
+      sceneVideo: new Queue<SceneVideoJobData>(QUEUE_SCENE_VIDEO, { connection: redis, defaultJobOptions }),
+      scenePoll: new Queue<ScenePollJobData>(QUEUE_SCENE_POLL, { connection: redis, defaultJobOptions }),
+      videoStitch: new Queue<VideoStitchJobData>(QUEUE_VIDEO_STITCH, {
+        connection: redis,
+        defaultJobOptions,
+      }),
     },
   };
 }
@@ -77,6 +105,12 @@ export async function closeDeps(deps: WorkerDeps): Promise<void> {
     deps.queues.analytics.close(),
     deps.queues.tokenRefresh.close(),
     deps.queues.automation.close(),
+    deps.queues.autoScan.close(),
+    deps.queues.autoPlan.close(),
+    deps.queues.scriptGen.close(),
+    deps.queues.sceneVideo.close(),
+    deps.queues.scenePoll.close(),
+    deps.queues.videoStitch.close(),
     deps.redis.quit(),
   ]);
 }

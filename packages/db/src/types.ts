@@ -10,8 +10,12 @@ import type {
   PostStatus,
   PostTargetStatus,
   PrivacyLevel,
+  RunStatus,
+  SceneStatus,
   SocialAccountStatus,
   UserRole,
+  VideoStatus,
+  WorkflowStatus,
 } from "@lsm/shared";
 
 export type Json =
@@ -569,6 +573,303 @@ export type Database = {
           reason?: string;
           generation_id?: string | null;
           balance_after?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      niche_packs: {
+        Row: {
+          id: string;
+          org_id: string | null;
+          name: string;
+          data: Json;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          org_id?: string | null;
+          name: string;
+          data?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string | null;
+          name?: string;
+          data?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      characters: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          description: string;
+          reference_image_url: string | null;
+          traits: Json;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          description?: string;
+          reference_image_url?: string | null;
+          traits?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          description?: string;
+          reference_image_url?: string | null;
+          traits?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      automation_workflows: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string | null;
+          name: string;
+          status: WorkflowStatus;
+          graph: Json;
+          compiled_plan: Json | null;
+          graph_hash: string | null;
+          timezone: string;
+          post_times: string[];
+          lead_time_min: number;
+          created_by: string | null;
+          last_run_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id?: string | null;
+          name: string;
+          status?: WorkflowStatus;
+          graph?: Json;
+          compiled_plan?: Json | null;
+          graph_hash?: string | null;
+          timezone?: string;
+          post_times?: string[];
+          lead_time_min?: number;
+          created_by?: string | null;
+          last_run_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string | null;
+          name?: string;
+          status?: WorkflowStatus;
+          graph?: Json;
+          compiled_plan?: Json | null;
+          graph_hash?: string | null;
+          timezone?: string;
+          post_times?: string[];
+          lead_time_min?: number;
+          created_by?: string | null;
+          last_run_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      automation_runs: {
+        Row: {
+          id: string;
+          org_id: string;
+          workflow_id: string;
+          run_date: string;
+          slot: string;
+          status: RunStatus;
+          credits_reserved: number;
+          credits_settled: number;
+          error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          org_id: string;
+          workflow_id: string;
+          run_date: string;
+          slot: string;
+          status?: RunStatus;
+          credits_reserved?: number;
+          credits_settled?: number;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          workflow_id?: string;
+          run_date?: string;
+          slot?: string;
+          status?: RunStatus;
+          credits_reserved?: number;
+          credits_settled?: number;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      automation_videos: {
+        Row: {
+          id: string;
+          run_id: string;
+          org_id: string;
+          social_account_id: string | null;
+          idx: number;
+          status: VideoStatus;
+          caption: string | null;
+          num_scenes: number | null;
+          final_url: string | null;
+          storage_path: string | null;
+          post_id: string | null;
+          error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          run_id: string;
+          org_id: string;
+          social_account_id?: string | null;
+          idx?: number;
+          status?: VideoStatus;
+          caption?: string | null;
+          num_scenes?: number | null;
+          final_url?: string | null;
+          storage_path?: string | null;
+          post_id?: string | null;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          run_id?: string;
+          org_id?: string;
+          social_account_id?: string | null;
+          idx?: number;
+          status?: VideoStatus;
+          caption?: string | null;
+          num_scenes?: number | null;
+          final_url?: string | null;
+          storage_path?: string | null;
+          post_id?: string | null;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      automation_scenes: {
+        Row: {
+          id: string;
+          video_id: string;
+          org_id: string;
+          idx: number;
+          status: SceneStatus;
+          beat: string | null;
+          prompt: string | null;
+          image_url: string | null;
+          video_url: string | null;
+          provider: string | null;
+          provider_task_id: string | null;
+          credits_charged: number;
+          error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          video_id: string;
+          org_id: string;
+          idx?: number;
+          status?: SceneStatus;
+          beat?: string | null;
+          prompt?: string | null;
+          image_url?: string | null;
+          video_url?: string | null;
+          provider?: string | null;
+          provider_task_id?: string | null;
+          credits_charged?: number;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          video_id?: string;
+          org_id?: string;
+          idx?: number;
+          status?: SceneStatus;
+          beat?: string | null;
+          prompt?: string | null;
+          image_url?: string | null;
+          video_url?: string | null;
+          provider?: string | null;
+          provider_task_id?: string | null;
+          credits_charged?: number;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      automation_run_steps: {
+        Row: {
+          id: string;
+          run_id: string;
+          org_id: string;
+          step: string;
+          status: "started" | "done" | "failed";
+          meta: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          run_id: string;
+          org_id: string;
+          step: string;
+          status: "started" | "done" | "failed";
+          meta?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          run_id?: string;
+          org_id?: string;
+          step?: string;
+          status?: "started" | "done" | "failed";
+          meta?: Json;
           created_at?: string;
         };
         Relationships: [];

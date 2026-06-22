@@ -2,9 +2,15 @@ import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import { createServiceClient, type Db } from "@lsm/db";
 import {
+  QUEUE_AUTO_PLAN,
+  QUEUE_AUTO_SCAN,
   QUEUE_PUBLISH,
+  QUEUE_SCENE_POLL,
   QUEUE_STATUS,
+  type AutoPlanJobData,
+  type AutoScanJobData,
   type PublishJobData,
+  type ScenePollJobData,
   type StatusJobData,
 } from "@lsm/shared";
 import type { TikTokOAuthConfig } from "@lsm/tiktok";
@@ -18,6 +24,9 @@ export interface ApiDeps {
   queues: {
     publish: Queue<PublishJobData>;
     status: Queue<StatusJobData>;
+    autoScan: Queue<AutoScanJobData>;
+    autoPlan: Queue<AutoPlanJobData>;
+    scenePoll: Queue<ScenePollJobData>;
   };
 }
 
@@ -54,6 +63,9 @@ export function createDeps(config: ApiConfig): ApiDeps {
         connection: redis,
         defaultJobOptions,
       }),
+      autoScan: new Queue<AutoScanJobData>(QUEUE_AUTO_SCAN, { connection: redis, defaultJobOptions }),
+      autoPlan: new Queue<AutoPlanJobData>(QUEUE_AUTO_PLAN, { connection: redis, defaultJobOptions }),
+      scenePoll: new Queue<ScenePollJobData>(QUEUE_SCENE_POLL, { connection: redis, defaultJobOptions }),
     },
   };
 }
@@ -62,6 +74,9 @@ export async function closeDeps(deps: ApiDeps): Promise<void> {
   await Promise.allSettled([
     deps.queues.publish.close(),
     deps.queues.status.close(),
+    deps.queues.autoScan.close(),
+    deps.queues.autoPlan.close(),
+    deps.queues.scenePoll.close(),
     deps.redis.quit(),
   ]);
 }
