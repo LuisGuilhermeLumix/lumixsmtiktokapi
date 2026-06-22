@@ -2,76 +2,77 @@
 // Server component (SEO); interatividade fica nos CTAs (client).
 
 import { CtaButton } from "@/components/landing/cta-button";
+import { RobotHeroSection } from "@/components/landing/robot-hero-section";
 import { Tracking } from "@/components/tracking";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 const FEATURES = [
   {
-    title: "OAuth oficial do TikTok",
-    text: "O cliente autoriza com 2 cliques e pode revogar quando quiser. Nenhuma senha trocada por WhatsApp.",
+    title: "Conexão sem senha, sem risco",
+    text: "O cliente autoriza pelo login oficial do TikTok em dois cliques e revoga quando quiser. Acabou a senha trocada no WhatsApp — e o perrengue de guardar acesso dos outros.",
   },
   {
-    title: "Multi-cliente com permissões",
-    text: "Papéis de owner, admin e operator — cada operador enxerga somente os clientes atribuídos a ele.",
+    title: "Cada operador no seu quadrado",
+    text: "Defina quem é owner, admin ou operator. O operador enxerga só os clientes que você atribuiu — sem acesso indevido e sem bagunça na equipe.",
   },
   {
-    title: "Publicação resiliente",
-    text: "Fila com retry automático. Se o post direto não estiver disponível, o vídeo entra como rascunho na conta — nada se perde.",
+    title: "Post que não cai",
+    text: "Se a publicação direta falhar, o vídeo entra como rascunho na conta do cliente automaticamente. Nada se perde, e você acompanha cada tentativa no painel.",
   },
   {
-    title: "Agendamento de verdade",
-    text: "Fila persistente no servidor: o post sai no horário mesmo sem nenhuma aba aberta.",
+    title: "Agende e esqueça",
+    text: "A fila roda no servidor: o vídeo sai no horário marcado mesmo com o computador desligado e nenhuma aba aberta.",
   },
   {
-    title: "Analytics automático",
-    text: "Followers, views, likes e comments coletados a cada 6 horas, com histórico por conta e por vídeo.",
+    title: "Relatório que se atualiza sozinho",
+    text: "Followers, views, likes e comments coletados a cada 6 horas, com histórico por conta e por vídeo. Pare de printar métrica na mão.",
   },
   {
-    title: "Feito para automação",
-    text: "API REST com API key e webhooks para n8n: seu fluxo de conteúdo pode publicar sozinho.",
+    title: "Publica até sem abrir o painel",
+    text: "API própria e webhooks prontos: seu n8n, Make ou Zapier gera o conteúdo e dispara a publicação sozinho, no seu fluxo de sempre.",
   },
 ];
 
 const STEPS = [
-  { n: "1", title: "Cadastre o cliente", text: "Crie o cliente no painel em segundos." },
+  { n: "1", title: "Crie o cliente", text: "Cadastre o cliente no painel em menos de um minuto." },
   {
     n: "2",
-    title: "Cliente autoriza o TikTok",
-    text: "Envie o link de conexão — autorização OAuth oficial, sem senha.",
+    title: "Mande o link de conexão",
+    text: "O cliente clica, autoriza pelo TikTok oficial e pronto — sem senha e sem você no meio.",
   },
   {
     n: "3",
-    title: "Publique ou agende",
-    text: "Suba o vídeo, escreva a legenda, escolha as contas e o horário.",
+    title: "Suba o vídeo",
+    text: "Escolha as contas, escreva a legenda e o horário. Publique na hora ou deixe agendado.",
   },
   {
     n: "4",
-    title: "Acompanhe os resultados",
-    text: "Métricas por conta e por vídeo, atualizadas automaticamente.",
+    title: "Veja os números",
+    text: "As métricas de cada conta e vídeo aparecem atualizadas sozinhas. Sem planilha, sem print.",
   },
 ];
 
 const FAQS = [
   {
-    q: "Preciso da senha do TikTok do cliente?",
-    a: "Não. A conexão usa o OAuth oficial do TikTok: o cliente autoriza o acesso com a própria conta e pode revogar quando quiser.",
+    q: "Preciso da senha do TikTok dos meus clientes?",
+    a: "Não — e isso é de propósito. A conexão usa o login oficial do TikTok (OAuth): o cliente autoriza o acesso na conta dele e pode revogar quando quiser. Você nunca vê, digita ou guarda a senha de ninguém.",
   },
   {
-    q: "É seguro? Onde ficam os tokens de acesso?",
-    a: "Os tokens são criptografados em repouso com AES-256-GCM, os dados são isolados por organização e toda ação sensível fica registrada em auditoria.",
+    q: "Os dados e os acessos dos meus clientes ficam seguros?",
+    a: "Ficam. Os tokens de acesso são criptografados em repouso (AES-256-GCM), cada organização tem os dados isolados das demais e toda ação sensível fica registrada em auditoria. Quem é operator só enxerga os clientes atribuídos a ele.",
   },
   {
     q: "E se o TikTok recusar uma publicação?",
-    a: "A fila tenta de novo automaticamente com intervalo crescente. Em último caso o vídeo é entregue como rascunho na conta do cliente — tudo registrado e visível no painel.",
+    a: "A fila tenta de novo automaticamente, com intervalo crescente. Se mesmo assim não publicar direto, o vídeo é entregue como rascunho na conta do cliente — nada se perde e você vê o status de cada tentativa no painel.",
   },
   {
-    q: "Funciona com meu fluxo de automação?",
-    a: "Sim. A API REST aceita autenticação por API key e há webhooks prontos para n8n e Make — dá para criar e publicar posts sem abrir o painel.",
+    q: "Tem limite de clientes ou de contas?",
+    a: "Não há limite estrutural de clientes nem de contas conectadas por organização. Se quiser controlar volume, dá para configurar quotas de upload por cliente — mas a régua é sua.",
   },
   {
-    q: "Quantos clientes posso gerenciar?",
-    a: "Não há limite estrutural de clientes ou contas. Quotas de upload são configuráveis por cliente, se você quiser controlar volume.",
+    q: "Quem mantém a ferramenta e me dá suporte?",
+    a: "O LSM é a mesma plataforma que a Lumix Agency usa para operar o TikTok dos próprios clientes, então quem cuida do produto vive a sua rotina. O acesso hoje é para equipes da Lumix e agências parceiras, com suporte direto de quem construiu e usa a ferramenta todos os dias.",
   },
 ];
 
@@ -135,43 +136,17 @@ export default function LandingPage() {
       </header>
 
       <main>
-        {/* 1 — hero */}
-        <section className="relative overflow-hidden px-6 pb-24 pt-16 text-center">
-          <div
-            className="glow-orb left-1/2 top-0 h-96 w-96 -translate-x-1/2 bg-lumix-purple"
-            aria-hidden
-          />
-          <div className="relative mx-auto max-w-3xl">
-            <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-6xl">
-              O TikTok de todos os seus clientes{" "}
-              <span className="text-gradient">em um só painel</span>
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg text-ink-dim">
-              Conecte contas via OAuth oficial, publique, agende e acompanhe métricas — sem pedir
-              senha a ninguém e sem trocar de aba a cada cliente.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-              <CtaButton href="/login" location="hero">
-                Entrar no painel
-              </CtaButton>
-              <CtaButton href="#como-funciona" variant="secondary" location="hero">
-                Ver como funciona
-              </CtaButton>
-            </div>
-            <p className="mt-4 text-sm text-ink-faint">
-              Operado pela Lumix Agency — a mesma plataforma que usamos nos nossos clientes.
-            </p>
-          </div>
-        </section>
+        {/* 1 — hero com robô 3D interativo (Spline) */}
+        <RobotHeroSection />
 
         {/* 2 — prova/números */}
         <section className="border-y border-border-subtle bg-surface-raised/50 px-6 py-10">
           <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 text-center sm:grid-cols-4">
             {[
-              ["Contas ilimitadas", "por organização"],
-              ["Coleta 6/6h", "de métricas"],
-              ["Retry automático", "em toda publicação"],
-              ["OAuth oficial", "zero senhas trocadas"],
+              ["Clientes sem limite", "cresça sem trocar de ferramenta"],
+              ["Métricas sozinhas", "atualizadas a cada 6 horas"],
+              ["Nenhum post perdido", "a fila tenta de novo por você"],
+              ["Zero senha trocada", "conexão oficial do TikTok"],
             ].map(([big, small]) => (
               <div key={big}>
                 <p className="text-xl font-bold text-gradient sm:text-2xl">{big}</p>
@@ -185,10 +160,10 @@ export default function LandingPage() {
         <section className="px-6 py-24">
           <div className="mx-auto max-w-6xl">
             <h2 className="text-center text-3xl font-bold sm:text-4xl">
-              Tudo que a operação de agência precisa
+              Tudo que a operação da sua agência precisa
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-center text-ink-dim">
-              Do OAuth ao relatório — o fluxo completo de TikTok multi-cliente.
+              Da conexão ao relatório — o fluxo completo de TikTok multi-cliente, sem gambiarra.
             </p>
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((f) => (
@@ -222,12 +197,12 @@ export default function LandingPage() {
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 lg:flex-row">
             <div className="flex-1">
               <h2 className="text-3xl font-bold sm:text-4xl">
-                Publique <span className="text-gradient">sem abrir o painel</span>
+                Deixe a publicação <span className="text-gradient">rodar sozinha</span>
               </h2>
               <p className="mt-4 text-ink-dim">
-                Cada organização pode gerar API keys e conectar o n8n por webhook assinado. Seu
-                fluxo gera o vídeo, chama a API e o LSM cuida do resto: fila, retry, fallback e
-                métricas.
+                Já usa n8n, Make ou Zapier? Gere a chave de API da sua agência e conecte. A partir
+                daí, seu robô de conteúdo cria o vídeo, dispara a publicação e o LSM cuida do resto —
+                fila, retry, fallback e métricas. Sua equipe só acompanha o resultado.
               </p>
             </div>
             <pre
@@ -268,18 +243,21 @@ export default function LandingPage() {
           />
           <div className="relative mx-auto max-w-2xl">
             <h2 className="text-3xl font-bold sm:text-4xl">
-              Centralize o TikTok da sua agência hoje
+              Centralize o TikTok da sua agência ainda esta semana
             </h2>
             <p className="mt-4 text-ink-dim">
-              Painel multi-cliente, publicação resiliente e métricas automáticas — operado pela
-              própria Lumix.
+              Painel multi-cliente, publicação que não deixa post cair e métricas que se atualizam
+              sozinhas — operado pela própria Lumix e aberto a um grupo selecionado de agências
+              parceiras.
             </p>
             <div className="mt-8">
               <CtaButton href="/login" location="cta-final">
                 Entrar no painel
               </CtaButton>
             </div>
-            <p className="mt-3 text-sm text-ink-faint">Acesso para equipes da Lumix e parceiros.</p>
+            <p className="mt-3 text-sm text-ink-faint">
+              Acesso atual para equipes da Lumix e agências parceiras.
+            </p>
           </div>
         </section>
       </main>

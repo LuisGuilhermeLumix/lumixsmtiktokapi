@@ -40,3 +40,13 @@ export const PRIVACY_LEVELS = [
   "SELF_ONLY",
 ] as const;
 export type PrivacyLevel = (typeof PRIVACY_LEVELS)[number];
+
+// ───────────── Estúdio de Conteúdo IA (kie.ai) ─────────────
+export const GENERATION_KINDS = ["image", "video"] as const;
+export type GenerationKind = (typeof GENERATION_KINDS)[number];
+
+export const GENERATION_STATUSES = ["queued", "processing", "done", "failed"] as const;
+export type GenerationStatus = (typeof GENERATION_STATUSES)[number];
+
+export const AUTOMATION_STATUSES = ["active", "paused"] as const;
+export type AutomationStatus = (typeof AUTOMATION_STATUSES)[number];

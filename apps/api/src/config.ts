@@ -24,6 +24,16 @@ const envSchema = z.object({
     .regex(/^[0-9a-f]{64}$/i, "esperado 64 chars hex (32 bytes) — gere com: openssl rand -hex 32"),
   N8N_WEBHOOK_SECRET: z.string().min(16, "use um segredo com pelo menos 16 chars"),
 
+  // Estúdio de Conteúdo IA (kie.ai). Opcionais: sem KIE_API_KEY o estúdio
+  // fica desativado e as rotas /generations respondem 503.
+  KIE_API_KEY: z.string().optional(),
+  KIE_CALLBACK_SECRET: z.string().optional(),
+  API_PUBLIC_URL: z.string().url().optional(),
+  // fal.ai — segundo provider (vídeo). Opcional; sem ela, provider=fal dá 503.
+  FAL_KEY: z.string().optional(),
+  // taxa de markup oculta sobre o custo do provider (1.3 = +30%)
+  CREDIT_MARKUP: z.coerce.number().positive().default(1.3),
+
   APP_URL: z.string().url().default("http://localhost:3000"),
 });
 
