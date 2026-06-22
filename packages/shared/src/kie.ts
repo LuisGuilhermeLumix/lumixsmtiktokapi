@@ -203,6 +203,9 @@ const MODEL_CREDITS: Record<string, number> = {
   "kling/v2": 54,
   "bytedance/seedance-v1-pro": 46,
   "minimax/hailuo-02": 50,
+  // ── fal.ai (imagem) ──
+  "fal-ai/flux/schnell": 2,
+  "fal-ai/flux/dev": 4,
   // ── fal.ai (vídeo) ──
   "fal-ai/kling-video/v2.1/standard/text-to-video": 40,
   "fal-ai/kling-video/v2.1/pro/text-to-video": 80,

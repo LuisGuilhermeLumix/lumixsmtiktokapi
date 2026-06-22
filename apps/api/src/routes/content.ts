@@ -160,6 +160,15 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
       if (b.aspect_ratio) input.aspect_ratio = b.aspect_ratio;
       if (b.kind === "video" && b.duration) input.duration = b.duration;
       if (b.image_url) input.image_url = b.image_url;
+      // fal: modelos de imagem (Flux) usam `image_size` em vez de aspect_ratio
+      if (provider === "fal" && b.kind === "image") {
+        const sizeMap: Record<string, string> = {
+          "9:16": "portrait_16_9",
+          "16:9": "landscape_16_9",
+          "1:1": "square_hd",
+        };
+        input.image_size = sizeMap[b.aspect_ratio ?? "9:16"] ?? "portrait_16_9";
+      }
 
       let taskId: string;
       try {

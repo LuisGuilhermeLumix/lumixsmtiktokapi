@@ -92,7 +92,7 @@ export default function StudioPage() {
 /* ───────────────────────── Geração avulsa ───────────────────────── */
 
 function AvulsaTab() {
-  const [kind, setKind] = useState<AiKind>("image");
+  const [kind, setKind] = useState<AiKind>("video");
   const models = kind === "image" ? IMAGE_MODELS : VIDEO_MODELS;
   const [modelId, setModelId] = useState(models[0].id);
   const model = getModel(modelId) ?? models[0];
