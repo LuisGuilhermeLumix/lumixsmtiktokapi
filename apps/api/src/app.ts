@@ -18,6 +18,7 @@ import { registerAnalyticsRoutes } from "./routes/analytics.js";
 import { registerApiKeyRoutes } from "./routes/apikeys.js";
 import { registerAuthTikTokRoutes } from "./routes/auth-tiktok.js";
 import { registerClientRoutes } from "./routes/clients.js";
+import { registerContentRoutes } from "./routes/content.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerPostRoutes } from "./routes/posts.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
@@ -77,8 +78,9 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
         { name: "clients", description: "Clientes da agência" },
         { name: "posts", description: "Publicações" },
         { name: "analytics", description: "Métricas" },
+        { name: "studio", description: "Estúdio de Conteúdo IA (kie.ai)" },
         { name: "settings", description: "API keys e configurações" },
-        { name: "webhooks", description: "Integração n8n" },
+        { name: "webhooks", description: "Integração n8n e kie.ai" },
         { name: "infra", description: "Healthcheck" },
       ],
     },
@@ -122,6 +124,7 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
   registerPostRoutes(app, deps, auth);
   registerAnalyticsRoutes(app, deps, auth);
   registerApiKeyRoutes(app, deps, auth);
+  registerContentRoutes(app, deps, auth);
   registerWebhookRoutes(app, deps);
 
   app.addHook("onClose", async () => {

@@ -6,20 +6,20 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "TikTok dos seus clientes em um só painel — Lumix Social Manager",
+    default: "TikTok multi-cliente para agências — Lumix Social Manager",
     template: "%s — Lumix Social Manager",
   },
   description:
-    "Conecte contas TikTok via OAuth oficial, publique, agende e acompanhe métricas de todos os seus clientes. Feito para agências. Integra com n8n e API.",
+    "Gerencie o TikTok de todos os seus clientes num painel só: conexão oficial sem senha, agendamento, retry automático e métricas a cada 6h. Integra com n8n, Make e Zapier.",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "pt_BR",
     url: SITE_URL,
     siteName: "Lumix Social Manager",
-    title: "TikTok dos seus clientes em um só painel — Lumix Social Manager",
+    title: "TikTok multi-cliente para agências — Lumix Social Manager",
     description:
-      "Conectar, publicar, agendar e medir contas TikTok de vários clientes — sem pedir senha a ninguém.",
+      "Conecte, publique, agende e meça o TikTok de vários clientes num painel só — sem pedir senha a ninguém e sem deixar post cair.",
   },
   twitter: { card: "summary_large_image" },
   robots: { index: true, follow: true },

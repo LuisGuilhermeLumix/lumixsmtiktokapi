@@ -21,6 +21,14 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z
     .string()
     .regex(/^[0-9a-f]{64}$/i, "esperado 64 chars hex (32 bytes) — gere com: openssl rand -hex 32"),
+
+  // Estúdio de Conteúdo IA — esteira de automação no worker.
+  KIE_API_KEY: z.string().optional(),
+  FAL_KEY: z.string().optional(),
+  KIE_LLM_MODEL: z.string().default("google/gemini-2.5-flash"),
+  CREDIT_MARKUP: z.coerce.number().positive().default(1.3),
+  /** timezone p/ casar os horários (post_times) das automações */
+  AUTOMATION_TZ: z.string().default("America/Sao_Paulo"),
 });
 
 export type WorkerConfig = z.infer<typeof envSchema>;

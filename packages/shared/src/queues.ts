@@ -5,6 +5,8 @@ export const QUEUE_PUBLISH = "publish";
 export const QUEUE_STATUS = "status";
 export const QUEUE_ANALYTICS = "analytics";
 export const QUEUE_TOKEN_REFRESH = "token-refresh";
+export const QUEUE_GENERATION = "generation";
+export const QUEUE_AUTOMATION = "automation";
 
 /** publica um post_target no TikTok (init → upload → dispara status) */
 export interface PublishJobData {
@@ -27,6 +29,22 @@ export interface AnalyticsJobData {
 /** renova tokens próximos do expiry; sem id = varre todos */
 export interface TokenRefreshJobData {
   socialAccountId?: string;
+}
+
+/** polling do status de uma geração kie.ai em andamento */
+export interface GenerationJobData {
+  generationId: string;
+  attempt?: number;
+}
+
+/** dispara uma rodada da esteira de automação; sem id = varre todas ativas no horário */
+export interface AutomationJobData {
+  automationId?: string;
+}
+
+/** jobId determinístico p/ polling de geração (sem ":" — regra do BullMQ) */
+export function generationJobId(generationId: string, attempt: number): string {
+  return `gen-${generationId}-${attempt}`;
 }
 
 /**

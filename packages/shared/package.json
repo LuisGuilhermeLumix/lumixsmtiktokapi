@@ -13,6 +13,14 @@
     "./crypto": {
       "types": "./dist/crypto.d.ts",
       "import": "./dist/crypto.js"
+    },
+    "./kie": {
+      "types": "./dist/kie.d.ts",
+      "import": "./dist/kie.js"
+    },
+    "./fal": {
+      "types": "./dist/fal.d.ts",
+      "import": "./dist/fal.js"
     }
   },
   "scripts": {

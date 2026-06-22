@@ -7,6 +7,7 @@
 import { Worker } from "bullmq";
 import {
   QUEUE_ANALYTICS,
+  QUEUE_AUTOMATION,
   QUEUE_PUBLISH,
   QUEUE_STATUS,
   QUEUE_TOKEN_REFRESH,
@@ -15,6 +16,7 @@ import { loadConfig } from "./config.js";
 import { closeDeps, createDeps } from "./deps.js";
 import { startHealthServer } from "./health.js";
 import { createAnalyticsProcessor } from "./processors/analytics.js";
+import { createAutomationProcessor } from "./processors/automation.js";
 import { createPublishProcessor } from "./processors/publish.js";
 import { createStatusProcessor } from "./processors/status.js";
 import { createTokenRefreshProcessor } from "./processors/token-refresh.js";
@@ -33,6 +35,8 @@ async function main() {
       connection,
       concurrency: 3,
     }),
+    // esteira de conteúdo IA: tick (scan) + pipelines (geração+publicação)
+    new Worker(QUEUE_AUTOMATION, createAutomationProcessor(deps), { connection, concurrency: 2 }),
   ];
 
   for (const worker of workers) {
@@ -57,6 +61,11 @@ async function main() {
     { pattern: "15 * * * *" }, // a cada hora (min 15, fora do pico do analytics)
     { name: "refresh", data: {} },
   );
+  await deps.queues.automation.upsertJobScheduler(
+    "automation-tick",
+    { pattern: "* * * * *" }, // a cada minuto: varre automações e enfileira as devidas
+    { name: "scan", data: {} },
+  );
 
   const health = startHealthServer(config.HEALTH_PORT, async () => {
     const counts = await deps.queues.publish.getJobCounts("waiting", "active", "failed", "delayed");
@@ -64,7 +73,7 @@ async function main() {
   });
 
   console.log(
-    `[lsm-worker] rodando — filas: publish, status, analytics (6h), token-refresh (1h); health na porta ${config.HEALTH_PORT}`,
+    `[lsm-worker] rodando — filas: publish, status, analytics (6h), token-refresh (1h), automation (tick 1min); health na porta ${config.HEALTH_PORT}`,
   );
 
   let shuttingDown = false;

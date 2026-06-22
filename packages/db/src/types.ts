@@ -3,6 +3,9 @@
 // `supabase gen types typescript` quando o projeto estiver linkado.
 
 import type {
+  AutomationStatus,
+  GenerationKind,
+  GenerationStatus,
   Platform,
   PostStatus,
   PostTargetStatus,
@@ -28,16 +31,19 @@ export type Database = {
         Row: {
           id: string;
           name: string;
+          credits_balance: number;
           created_at: string;
         };
         Insert: {
           id?: string;
           name: string;
+          credits_balance?: number;
           created_at?: string;
         };
         Update: {
           id?: string;
           name?: string;
+          credits_balance?: number;
           created_at?: string;
         };
         Relationships: [];
@@ -414,6 +420,156 @@ export type Database = {
           created_at?: string;
           last_used_at?: string | null;
           revoked_at?: string | null;
+        };
+        Relationships: [];
+      };
+      generations: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string | null;
+          created_by: string | null;
+          automation_id: string | null;
+          kind: GenerationKind;
+          model: string;
+          prompt: string;
+          input: Json;
+          status: GenerationStatus;
+          kie_task_id: string | null;
+          result_url: string | null;
+          storage_path: string | null;
+          credits_charged: number;
+          error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id?: string | null;
+          created_by?: string | null;
+          automation_id?: string | null;
+          kind: GenerationKind;
+          model: string;
+          prompt?: string;
+          input?: Json;
+          status?: GenerationStatus;
+          kie_task_id?: string | null;
+          result_url?: string | null;
+          storage_path?: string | null;
+          credits_charged?: number;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string | null;
+          created_by?: string | null;
+          automation_id?: string | null;
+          kind?: GenerationKind;
+          model?: string;
+          prompt?: string;
+          input?: Json;
+          status?: GenerationStatus;
+          kie_task_id?: string | null;
+          result_url?: string | null;
+          storage_path?: string | null;
+          credits_charged?: number;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      content_automations: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string | null;
+          social_account_id: string;
+          created_by: string | null;
+          niche: string;
+          videos_per_day: number;
+          video_duration: number;
+          image_model: string;
+          video_model: string;
+          scene_agent_prompt: string;
+          video_agent_prompt: string;
+          post_times: string[];
+          status: AutomationStatus;
+          last_run_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id?: string | null;
+          social_account_id: string;
+          created_by?: string | null;
+          niche: string;
+          videos_per_day?: number;
+          video_duration?: number;
+          image_model: string;
+          video_model: string;
+          scene_agent_prompt?: string;
+          video_agent_prompt?: string;
+          post_times?: string[];
+          status?: AutomationStatus;
+          last_run_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string | null;
+          social_account_id?: string;
+          created_by?: string | null;
+          niche?: string;
+          videos_per_day?: number;
+          video_duration?: number;
+          image_model?: string;
+          video_model?: string;
+          scene_agent_prompt?: string;
+          video_agent_prompt?: string;
+          post_times?: string[];
+          status?: AutomationStatus;
+          last_run_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      credit_ledger: {
+        Row: {
+          id: string;
+          org_id: string;
+          delta: number;
+          reason: string;
+          generation_id: string | null;
+          balance_after: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          delta: number;
+          reason: string;
+          generation_id?: string | null;
+          balance_after: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          delta?: number;
+          reason?: string;
+          generation_id?: string | null;
+          balance_after?: number;
+          created_at?: string;
         };
         Relationships: [];
       };

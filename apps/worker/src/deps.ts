@@ -3,10 +3,12 @@ import { Redis } from "ioredis";
 import { createServiceClient, type Db } from "@lsm/db";
 import {
   QUEUE_ANALYTICS,
+  QUEUE_AUTOMATION,
   QUEUE_PUBLISH,
   QUEUE_STATUS,
   QUEUE_TOKEN_REFRESH,
   type AnalyticsJobData,
+  type AutomationJobData,
   type PublishJobData,
   type StatusJobData,
   type TokenRefreshJobData,
@@ -24,6 +26,7 @@ export interface WorkerDeps {
     status: Queue<StatusJobData>;
     analytics: Queue<AnalyticsJobData>;
     tokenRefresh: Queue<TokenRefreshJobData>;
+    automation: Queue<AutomationJobData>;
   };
 }
 
@@ -59,6 +62,10 @@ export function createDeps(config: WorkerConfig): WorkerDeps {
         connection: redis,
         defaultJobOptions,
       }),
+      automation: new Queue<AutomationJobData>(QUEUE_AUTOMATION, {
+        connection: redis,
+        defaultJobOptions,
+      }),
     },
   };
 }
@@ -69,6 +76,7 @@ export async function closeDeps(deps: WorkerDeps): Promise<void> {
     deps.queues.status.close(),
     deps.queues.analytics.close(),
     deps.queues.tokenRefresh.close(),
+    deps.queues.automation.close(),
     deps.redis.quit(),
   ]);
 }
