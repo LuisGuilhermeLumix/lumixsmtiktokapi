@@ -81,7 +81,10 @@ export default function LoginPage() {
           </Suspense>
         </div>
         <p className="mt-4 text-center text-xs text-ink-faint">
-          Acesso criado pelo administrador da sua organização.
+          Não tem conta?{" "}
+          <Link href="/signup" className="text-lumix-blue hover:underline">
+            Criar conta grátis
+          </Link>
         </p>
       </div>
     </main>

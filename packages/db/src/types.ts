@@ -36,19 +36,103 @@ export type Database = {
           id: string;
           name: string;
           credits_balance: number;
+          plan: string;
+          trial_ends_at: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           name: string;
           credits_balance?: number;
+          plan?: string;
+          trial_ends_at?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           name?: string;
           credits_balance?: number;
+          plan?: string;
+          trial_ends_at?: string | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      plans: {
+        Row: {
+          id: string;
+          name: string;
+          max_clients: number | null;
+          max_social_accounts: number | null;
+          monthly_credits: number;
+          price_cents: number;
+          features: Json;
+          sort: number;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          name: string;
+          max_clients?: number | null;
+          max_social_accounts?: number | null;
+          monthly_credits?: number;
+          price_cents?: number;
+          features?: Json;
+          sort?: number;
+          active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          max_clients?: number | null;
+          max_social_accounts?: number | null;
+          monthly_credits?: number;
+          price_cents?: number;
+          features?: Json;
+          sort?: number;
+          active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      subscriptions: {
+        Row: {
+          id: string;
+          org_id: string;
+          plan: string;
+          status: "active" | "trialing" | "past_due" | "canceled";
+          provider: string | null;
+          provider_customer_id: string | null;
+          provider_subscription_id: string | null;
+          current_period_end: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          plan?: string;
+          status?: "active" | "trialing" | "past_due" | "canceled";
+          provider?: string | null;
+          provider_customer_id?: string | null;
+          provider_subscription_id?: string | null;
+          current_period_end?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          plan?: string;
+          status?: "active" | "trialing" | "past_due" | "canceled";
+          provider?: string | null;
+          provider_customer_id?: string | null;
+          provider_subscription_id?: string | null;
+          current_period_end?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };

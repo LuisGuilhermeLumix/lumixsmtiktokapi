@@ -251,8 +251,8 @@ export default function LandingPage() {
               parceiras.
             </p>
             <div className="mt-8">
-              <CtaButton href="/login" location="cta-final">
-                Entrar no painel
+              <CtaButton href="/signup" location="cta-final">
+                Criar conta grátis
               </CtaButton>
             </div>
             <p className="mt-3 text-sm text-ink-faint">

@@ -8,6 +8,7 @@ import { assertClientAccess, visibleClientIds } from "../lib/access.js";
 import { logAudit } from "../lib/audit.js";
 import type { AuthHooks } from "../lib/auth.js";
 import { httpError } from "../lib/errors.js";
+import { assertCanAddClient } from "../lib/plan.js";
 
 const clientIdParam = z.object({ id: z.string().uuid() });
 
@@ -66,6 +67,7 @@ export function registerClientRoutes(app: FastifyInstance, deps: ApiDeps, auth: 
       },
     },
     async (req, reply) => {
+      await assertCanAddClient(deps, req.auth!.orgId); // limite do plano
       const { data, error } = await deps.db
         .from("clients")
         .insert({
