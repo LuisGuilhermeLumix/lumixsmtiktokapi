@@ -30,7 +30,7 @@ export default function SignupPage() {
       password,
       options: {
         data: { workspace: workspace.trim() || email.split("@")[0] },
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     setLoading(false);
