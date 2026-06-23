@@ -39,6 +39,16 @@ export default function AutomationsPage() {
       .catch(() => setTemplates([]));
   }, []);
 
+  async function remove(id: string, name: string) {
+    if (!confirm(`Excluir a automação "${name}"?`)) return;
+    try {
+      await apiFetch(`/workflows/${id}`, { method: "DELETE" });
+      setItems((prev) => (prev ? prev.filter((w) => w.id !== id) : prev));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   async function createFromTemplate(templateId: string, templateName: string) {
     setBusy(true);
     setError(null);
@@ -128,27 +138,32 @@ export default function AutomationsPage() {
       ) : (
         <div className="space-y-3">
           {items.map((w) => (
-            <Link key={w.id} href={`/studio/automations/${w.id}`} className="block">
-              <Card className="flex items-center justify-between transition-colors hover:border-lumix-purple/50">
-                <div>
-                  <p className="font-medium">{w.name}</p>
-                  <p className="mt-1 text-xs text-ink-faint">
-                    {w.post_times?.length ? w.post_times.join(", ") : "sem horários"}
-                  </p>
-                </div>
-                <span
-                  className={`rounded px-2 py-0.5 text-xs ${
-                    w.status === "active"
-                      ? "bg-emerald-600/15 text-emerald-300"
-                      : w.status === "paused"
-                        ? "bg-amber-600/15 text-amber-300"
-                        : "bg-surface-overlay text-ink-faint"
-                  }`}
-                >
-                  {STATUS_LABEL[w.status]}
-                </span>
-              </Card>
-            </Link>
+            <Card key={w.id} className="flex items-center justify-between gap-3 transition-colors hover:border-lumix-purple/50">
+              <Link href={`/studio/automations/${w.id}`} className="min-w-0 flex-1">
+                <p className="font-medium">{w.name}</p>
+                <p className="mt-1 text-xs text-ink-faint">
+                  {w.post_times?.length ? w.post_times.join(", ") : "sem horários"}
+                </p>
+              </Link>
+              <span
+                className={`rounded px-2 py-0.5 text-xs ${
+                  w.status === "active"
+                    ? "bg-emerald-600/15 text-emerald-300"
+                    : w.status === "paused"
+                      ? "bg-amber-600/15 text-amber-300"
+                      : "bg-surface-overlay text-ink-faint"
+                }`}
+              >
+                {STATUS_LABEL[w.status]}
+              </span>
+              <button
+                onClick={() => remove(w.id, w.name)}
+                className="text-xs text-ink-faint hover:text-red-400"
+                title="Excluir"
+              >
+                ✕
+              </button>
+            </Card>
           ))}
         </div>
       )}

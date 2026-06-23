@@ -1,7 +1,7 @@
 "use client";
 
-// Designer visual da automação (React Flow). Paleta → canvas → painel de config
-// (JSON por nó) → Validar (compila) / Testar (run) / Salvar / Ativar.
+// Designer NO-CODE da automação (React Flow + nós customizados com controles
+// inline). Tela cheia, paleta por categoria, CRUD de nó, Validar/Testar/Salvar/Ativar.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -10,20 +10,22 @@ import {
   ReactFlow,
   Background,
   Controls,
+  MiniMap,
   addEdge,
-  useNodesState,
   useEdgesState,
+  useNodesState,
   type Connection,
   type Edge,
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { NODE_CATEGORY, NODE_TYPES } from "@lsm/shared/automation";
+import { NODE_CATEGORY, NODE_TYPES, type NodeType } from "@lsm/shared/automation";
 import { apiFetch } from "@/lib/api";
-import { Banner, Button, Card, Label, Spinner, Textarea } from "@/components/ui";
+import { defaultConfig } from "@/lib/automation-fields";
+import { EditorProvider, LsmNode, type EditorData, type LsmNodeData } from "@/components/automation/automation-node";
+import { Banner, Button } from "@/components/ui";
 
-type NodeData = { label: string; nodeType: string; config: Record<string, unknown> };
-type FlowNode = Node<NodeData>;
+type FlowNode = Node<LsmNodeData, "lsm">;
 
 interface Workflow {
   id: string;
@@ -31,52 +33,34 @@ interface Workflow {
   status: "draft" | "active" | "paused";
   graph: { nodes: GraphNode[]; edges: GraphEdge[] };
 }
-interface GraphNode {
-  id: string;
-  type: string;
-  position?: { x: number; y: number };
-  config?: Record<string, unknown>;
-  label?: string;
-}
-interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  sourceHandle?: string;
-  targetHandle?: string;
-}
-interface Run {
-  id: string;
-  status: string;
-  slot: string;
-  created_at: string;
-}
+interface GraphNode { id: string; type: string; position?: { x: number; y: number }; config?: Record<string, unknown>; label?: string }
+interface GraphEdge { id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }
+interface Run { id: string; status: string; slot: string; created_at: string }
 
-const CAT_COLOR: Record<string, string> = {
-  trigger: "#3b82f6",
-  flow: "#9ca3af",
-  ai: "#8b5cf6",
-  media: "#d946ef",
-  data: "#10b981",
-  output: "#f59e0b",
+const CAT_LABEL: Record<string, string> = {
+  trigger: "Gatilho / Fontes",
+  flow: "Fluxo",
+  ai: "Agentes IA",
+  media: "Mídia",
+  data: "Dados",
+  output: "Saída",
 };
 
 export default function AutomationEditor() {
-  const params = useParams<{ id: string }>();
-  const id = params.id;
+  const { id } = useParams<{ id: string }>();
+  const nodeTypes = useMemo(() => ({ lsm: LsmNode }), []);
 
   const [wf, setWf] = useState<Workflow | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [editorData, setEditorData] = useState<EditorData>({ packs: [], characters: [] });
   const [runs, setRuns] = useState<Run[]>([]);
+  const [showRuns, setShowRuns] = useState(false);
   const [msg, setMsg] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const loadRuns = useCallback(() => {
-    apiFetch<{ runs: Run[] }>(`/workflows/${id}/runs`)
-      .then((r) => setRuns(r.runs))
-      .catch(() => setRuns([]));
+    apiFetch<{ runs: Run[] }>(`/workflows/${id}/runs`).then((r) => setRuns(r.runs)).catch(() => setRuns([]));
   }, [id]);
 
   useEffect(() => {
@@ -86,94 +70,43 @@ export default function AutomationEditor() {
         setNodes(
           (r.workflow.graph?.nodes ?? []).map((n) => ({
             id: n.id,
-            position: n.position ?? { x: 80, y: 80 },
-            data: { label: n.label ?? n.type, nodeType: n.type, config: n.config ?? {} },
-            style: {
-              border: `2px solid ${CAT_COLOR[NODE_CATEGORY[n.type as keyof typeof NODE_CATEGORY] ?? "flow"]}`,
-              borderRadius: 8,
-              padding: 6,
-              background: "#13131a",
-              color: "#e5e7eb",
-              fontSize: 12,
-            },
+            type: "lsm" as const,
+            position: n.position ?? { x: 120, y: 120 },
+            data: { nodeType: n.type as NodeType, config: n.config ?? {} },
           })),
         );
-        setEdges(
-          (r.workflow.graph?.edges ?? []).map((e) => ({
-            id: e.id,
-            source: e.source,
-            target: e.target,
-            sourceHandle: e.sourceHandle,
-            targetHandle: e.targetHandle,
-          })),
-        );
+        setEdges((r.workflow.graph?.edges ?? []).map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle, animated: true })));
       })
       .catch((e: Error) => setMsg({ kind: "error", text: e.message }));
+
+    Promise.all([
+      apiFetch<{ niche_packs: Array<{ id: string; name: string }> }>("/niche-packs").catch(() => ({ niche_packs: [] })),
+      apiFetch<{ characters: Array<{ id: string; name: string }> }>("/characters").catch(() => ({ characters: [] })),
+    ]).then(([p, c]) => setEditorData({ packs: p.niche_packs, characters: c.characters }));
     loadRuns();
   }, [id, setNodes, setEdges, loadRuns]);
 
-  const onConnect = useCallback(
-    (c: Connection) => setEdges((eds) => addEdge({ ...c, id: crypto.randomUUID() }, eds)),
-    [setEdges],
-  );
+  const onConnect = useCallback((c: Connection) => setEdges((eds) => addEdge({ ...c, id: crypto.randomUUID(), animated: true }, eds)), [setEdges]);
 
-  function addNode(type: string) {
-    const nid = crypto.randomUUID();
+  function addNode(type: NodeType) {
     setNodes((ns) => [
       ...ns,
-      {
-        id: nid,
-        position: { x: 120 + Math.random() * 240, y: 80 + Math.random() * 240 },
-        data: { label: type, nodeType: type, config: {} },
-        style: {
-          border: `2px solid ${CAT_COLOR[NODE_CATEGORY[type as keyof typeof NODE_CATEGORY] ?? "flow"]}`,
-          borderRadius: 8,
-          padding: 6,
-          background: "#13131a",
-          color: "#e5e7eb",
-          fontSize: 12,
-        },
-      },
+      { id: crypto.randomUUID(), type: "lsm", position: { x: 160 + Math.random() * 320, y: 100 + Math.random() * 320 }, data: { nodeType: type, config: defaultConfig(type) } },
     ]);
-  }
-
-  const selectedNode = useMemo(() => nodes.find((n) => n.id === selected) ?? null, [nodes, selected]);
-
-  function updateConfig(raw: string) {
-    try {
-      const config = JSON.parse(raw || "{}") as Record<string, unknown>;
-      setNodes((ns) => ns.map((n) => (n.id === selected ? { ...n, data: { ...n.data, config } } : n)));
-      setMsg(null);
-    } catch {
-      setMsg({ kind: "error", text: "JSON inválido na config do nó." });
-    }
   }
 
   function serialize() {
     return {
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        type: n.data.nodeType,
-        position: n.position,
-        config: n.data.config,
-        label: n.data.label,
-      })),
-      edges: edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourceHandle: e.sourceHandle ?? undefined,
-        targetHandle: e.targetHandle ?? undefined,
-      })),
+      nodes: nodes.map((n) => ({ id: n.id, type: n.data.nodeType, position: n.position, config: n.data.config })),
+      edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle ?? undefined, targetHandle: e.targetHandle ?? undefined })),
     };
   }
 
-  async function save() {
+  async function action(fn: () => Promise<void>) {
     setBusy(true);
     setMsg(null);
     try {
-      await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize() } });
-      setMsg({ kind: "success", text: "Salvo." });
+      await fn();
     } catch (e) {
       setMsg({ kind: "error", text: (e as Error).message });
     } finally {
@@ -181,166 +114,128 @@ export default function AutomationEditor() {
     }
   }
 
-  async function validate() {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const r = await apiFetch<{ ok: boolean; errors?: string[] }>(`/workflows/${id}/validate`, {
-        method: "POST",
-        body: { graph: serialize() },
-      });
-      setMsg(
-        r.ok
-          ? { kind: "success", text: "Grafo válido — compilado e pronto para ativar." }
-          : { kind: "error", text: `Inválido: ${r.errors?.join(" | ")}` },
-      );
-    } catch (e) {
-      setMsg({ kind: "error", text: (e as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
+  const save = () => action(async () => {
+    await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize() } });
+    setMsg({ kind: "success", text: "Salvo." });
+  });
+  const validate = () => action(async () => {
+    const r = await apiFetch<{ ok: boolean; errors?: string[] }>(`/workflows/${id}/validate`, { method: "POST", body: { graph: serialize() } });
+    setMsg(r.ok ? { kind: "success", text: "Grafo válido — pronto para ativar." } : { kind: "error", text: `Inválido: ${r.errors?.join(" | ")}` });
+  });
+  const test = () => action(async () => {
+    await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize() } });
+    const r = await apiFetch<{ run_id: string }>(`/workflows/${id}/test`, { method: "POST" });
+    setMsg({ kind: "info", text: `Run de teste disparado.` });
+    setShowRuns(true);
+    setTimeout(loadRuns, 1500);
+  });
+  const setStatus = (status: "active" | "paused") => action(async () => {
+    await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize(), status } });
+    setWf((w) => (w ? { ...w, status } : w));
+    setMsg({ kind: "success", text: status === "active" ? "Automação ativada." : "Pausada." });
+  });
 
-  async function test() {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize() } });
-      const r = await apiFetch<{ run_id: string }>(`/workflows/${id}/test`, { method: "POST" });
-      setMsg({ kind: "info", text: `Run de teste disparado: ${r.run_id}` });
-      setTimeout(loadRuns, 1500);
-    } catch (e) {
-      setMsg({ kind: "error", text: (e as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
+  const grouped = useMemo(() => {
+    const g: Record<string, NodeType[]> = {};
+    for (const t of NODE_TYPES) (g[NODE_CATEGORY[t]] ??= []).push(t);
+    return g;
+  }, []);
 
-  async function setStatus(status: "active" | "paused") {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize(), status } });
-      setWf((w) => (w ? { ...w, status } : w));
-      setMsg({ kind: "success", text: status === "active" ? "Automação ativada." : "Pausada." });
-    } catch (e) {
-      setMsg({ kind: "error", text: (e as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (!wf) return <Spinner />;
+  if (!wf) return <p className="text-sm text-ink-dim">Carregando…</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100vh-6rem)] flex-col gap-3">
+      {/* toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link href="/studio/automations" className="text-sm text-ink-dim hover:text-ink">
-            ← Automações
-          </Link>
-          <h1 className="mt-1 text-xl font-bold">{wf.name}</h1>
+        <div className="flex items-center gap-3">
+          <Link href="/studio/automations" className="text-sm text-ink-dim hover:text-ink">← Automações</Link>
+          <h1 className="text-lg font-bold">{wf.name}</h1>
+          <span className={`rounded px-2 py-0.5 text-xs ${wf.status === "active" ? "bg-emerald-600/15 text-emerald-300" : wf.status === "paused" ? "bg-amber-600/15 text-amber-300" : "bg-surface-overlay text-ink-faint"}`}>
+            {wf.status === "active" ? "Ativa" : wf.status === "paused" ? "Pausada" : "Rascunho"}
+          </span>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={validate} disabled={busy}>
-            Validar
-          </Button>
-          <Button variant="secondary" onClick={test} disabled={busy}>
-            Testar
-          </Button>
-          <Button onClick={save} disabled={busy}>
-            Salvar
-          </Button>
+          <Button variant="ghost" onClick={() => { setShowRuns((s) => !s); loadRuns(); }}>Runs</Button>
+          <Button variant="secondary" onClick={validate} disabled={busy}>Validar</Button>
+          <Button variant="secondary" onClick={test} disabled={busy}>Testar</Button>
+          <Button onClick={save} disabled={busy}>Salvar</Button>
           {wf.status === "active" ? (
-            <Button variant="danger" onClick={() => setStatus("paused")} disabled={busy}>
-              Pausar
-            </Button>
+            <Button variant="danger" onClick={() => setStatus("paused")} disabled={busy}>Pausar</Button>
           ) : (
-            <Button onClick={() => setStatus("active")} disabled={busy}>
-              Ativar
-            </Button>
+            <Button onClick={() => setStatus("active")} disabled={busy}>Ativar</Button>
           )}
         </div>
       </div>
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 
-      <div className="grid gap-4 lg:grid-cols-[200px_1fr_280px]">
+      {/* área principal — tela cheia */}
+      <div className="flex min-h-0 flex-1 gap-3">
         {/* paleta */}
-        <Card className="max-h-[560px] space-y-2 overflow-y-auto p-3">
-          <p className="text-xs font-semibold uppercase text-ink-faint">Nós</p>
-          {NODE_TYPES.map((t) => (
-            <button
-              key={t}
-              onClick={() => addNode(t)}
-              className="block w-full rounded border border-border-subtle px-2 py-1 text-left text-xs text-ink-dim hover:border-lumix-purple hover:text-ink"
-              style={{ borderLeft: `3px solid ${CAT_COLOR[NODE_CATEGORY[t]] ?? "#9ca3af"}` }}
-            >
-              {t}
-            </button>
+        <div className="w-48 shrink-0 space-y-3 overflow-y-auto rounded-xl border border-border-subtle bg-surface-raised p-3">
+          {Object.entries(grouped).map(([cat, types]) => (
+            <div key={cat}>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">{CAT_LABEL[cat] ?? cat}</p>
+              <div className="space-y-1">
+                {types.map((t) => (
+                  <button key={t} onClick={() => addNode(t)} className="block w-full rounded-md border border-border-subtle px-2 py-1 text-left text-xs text-ink-dim hover:border-lumix-purple hover:text-ink">
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
-        </Card>
-
-        {/* canvas */}
-        <div className="h-[560px] overflow-hidden rounded-xl border border-border-subtle">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, n) => setSelected(n.id)}
-            fitView
-            colorMode="dark"
-          >
-            <Background />
-            <Controls />
-          </ReactFlow>
         </div>
 
-        {/* painel de config + histórico */}
-        <div className="space-y-4">
-          <Card className="space-y-2 p-3">
-            <p className="text-xs font-semibold uppercase text-ink-faint">Config do nó</p>
-            {selectedNode ? (
-              <>
-                <p className="text-sm font-medium">{selectedNode.data.nodeType}</p>
-                <Label htmlFor="cfg">JSON</Label>
-                <Textarea
-                  id="cfg"
-                  rows={10}
-                  defaultValue={JSON.stringify(selectedNode.data.config, null, 2)}
-                  onBlur={(e) => updateConfig(e.target.value)}
-                  className="font-mono text-xs"
-                />
-                <p className="text-xs text-ink-faint">Edite e clique fora p/ aplicar.</p>
-              </>
-            ) : (
-              <p className="text-xs text-ink-faint">Clique num nó para editar.</p>
-            )}
-          </Card>
+        {/* canvas */}
+        <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-border-subtle">
+          <EditorProvider value={editorData}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              fitView
+              colorMode="dark"
+              defaultEdgeOptions={{ animated: true, style: { stroke: "#8b5cf6" } }}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background gap={18} color="#26263a" />
+              <Controls />
+              <MiniMap pannable zoomable className="!bg-surface-raised" nodeColor="#8b5cf6" maskColor="rgba(10,10,15,0.7)" />
+            </ReactFlow>
+          </EditorProvider>
 
-          <Card className="space-y-2 p-3">
+          {nodes.length === 0 && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <p className="text-sm text-ink-faint">Clique nos nós da paleta para montar a automação →</p>
+            </div>
+          )}
+        </div>
+
+        {/* drawer de runs */}
+        {showRuns && (
+          <div className="w-64 shrink-0 space-y-2 overflow-y-auto rounded-xl border border-border-subtle bg-surface-raised p-3">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase text-ink-faint">Runs recentes</p>
-              <button onClick={loadRuns} className="text-xs text-lumix-blue hover:underline">
-                atualizar
-              </button>
+              <button onClick={loadRuns} className="text-xs text-lumix-blue hover:underline">↻</button>
             </div>
             {runs.length === 0 ? (
               <p className="text-xs text-ink-faint">Nenhum run ainda.</p>
             ) : (
               <ul className="space-y-1 text-xs">
-                {runs.slice(0, 8).map((r) => (
-                  <li key={r.id} className="flex justify-between gap-2">
+                {runs.slice(0, 20).map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-2 rounded border border-border-subtle px-2 py-1">
                     <span className="truncate text-ink-dim">{r.slot}</span>
-                    <span className="text-ink-faint">{r.status}</span>
+                    <span className={r.status === "done" ? "text-emerald-300" : r.status === "failed" ? "text-red-400" : "text-ink-faint"}>{r.status}</span>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
