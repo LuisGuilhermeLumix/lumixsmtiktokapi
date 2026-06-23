@@ -58,8 +58,8 @@ export function RobotHeroSection() {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start"
           >
-            <CtaButton href="/login" location="hero">
-              Entrar no painel
+            <CtaButton href="/signup" location="hero">
+              Criar conta grátis
             </CtaButton>
             <CtaButton href="#como-funciona" variant="secondary" location="hero">
               Ver como funciona

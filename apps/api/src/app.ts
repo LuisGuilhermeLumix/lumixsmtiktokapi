@@ -21,6 +21,7 @@ import { registerAuthTikTokRoutes } from "./routes/auth-tiktok.js";
 import { registerClientRoutes } from "./routes/clients.js";
 import { registerContentRoutes } from "./routes/content.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerMeRoutes } from "./routes/me.js";
 import { registerPostRoutes } from "./routes/posts.js";
 import { registerWorkflowRoutes } from "./routes/workflows.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
@@ -76,6 +77,7 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
         version: "0.1.0",
       },
       tags: [
+        { name: "account", description: "Conta, organização e plano" },
         { name: "auth", description: "OAuth TikTok" },
         { name: "clients", description: "Clientes da agência" },
         { name: "posts", description: "Publicações" },
@@ -122,6 +124,7 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
 
   const auth = createAuthHooks(deps);
   registerHealthRoutes(app);
+  registerMeRoutes(app, deps, auth);
   registerAuthTikTokRoutes(app, deps, auth);
   registerClientRoutes(app, deps, auth);
   registerPostRoutes(app, deps, auth);

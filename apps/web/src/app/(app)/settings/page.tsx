@@ -24,6 +24,30 @@ const ROLE_LABEL: Record<string, string> = {
   operator: "Operator",
 };
 
+interface MeResp {
+  org: { name: string; plan: string; credits_balance: number } | null;
+  plan: { id: string; name: string; max_clients: number | null; max_social_accounts: number | null; monthly_credits: number };
+  usage: { clients: number; social_accounts: number };
+}
+
+function UsageBar({ label, used, max }: { label: string; used: number; max: number | null }) {
+  const pct = max ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  return (
+    <div>
+      <div className="flex justify-between text-xs">
+        <span className="text-ink-dim">{label}</span>
+        <span className="text-ink-faint">
+          {used}
+          {max != null ? ` / ${max}` : " / ∞"}
+        </span>
+      </div>
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-overlay">
+        <div className="h-full rounded-full bg-lumix-purple" style={{ width: max ? `${pct}%` : "8%" }} />
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [keys, setKeys] = useState<ApiKeyMeta[] | null>(null);
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -33,6 +57,7 @@ export default function SettingsPage() {
   const [creating, setCreating] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [me, setMe] = useState<MeResp | null>(null);
 
   const loadKeys = useCallback(() => {
     apiFetch<{ api_keys: ApiKeyMeta[] }>("/api-keys")
@@ -42,6 +67,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadKeys();
+    apiFetch<MeResp>("/me").then(setMe).catch(() => setMe(null));
     // membros via RLS: usuário só enxerga a própria org
     createClient()
       .from("users")
@@ -91,6 +117,33 @@ export default function SettingsPage() {
     <div className="space-y-8">
       <h1 className="text-2xl font-bold">Configurações</h1>
       {error && <Banner kind="error">{error}</Banner>}
+
+      {/* ── Plano & uso ──────────────────────────────────────────── */}
+      {me && (
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">
+                Plano <span className="text-gradient">{me.plan.name}</span>
+              </h2>
+              <p className="text-xs text-ink-faint">
+                {me.org?.name} · {me.org?.credits_balance ?? 0} créditos
+              </p>
+            </div>
+            <Button variant="secondary" disabled>
+              Upgrade (em breve)
+            </Button>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <UsageBar label="Clientes" used={me.usage.clients} max={me.plan.max_clients} />
+            <UsageBar label="Contas TikTok" used={me.usage.social_accounts} max={me.plan.max_social_accounts} />
+            <div>
+              <p className="text-xs text-ink-dim">Créditos/mês do plano</p>
+              <p className="mt-1 text-sm font-semibold text-ink">{me.plan.monthly_credits}</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* ── API keys ─────────────────────────────────────────────── */}
       <Card>

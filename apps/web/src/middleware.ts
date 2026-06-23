@@ -27,7 +27,7 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = req.nextUrl.pathname;
-  if (path === "/login") {
+  if (path === "/login" || path === "/signup") {
     if (user) return NextResponse.redirect(new URL("/dashboard", req.url));
     return res;
   }
@@ -42,10 +42,12 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/login",
+    "/signup",
     "/dashboard/:path*",
     "/clients/:path*",
     "/posts/:path*",
     "/analytics/:path*",
     "/settings/:path*",
+    "/studio/:path*",
   ],
 };

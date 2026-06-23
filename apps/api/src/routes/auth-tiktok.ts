@@ -15,6 +15,7 @@ import { assertClientAccess } from "../lib/access.js";
 import { logAudit } from "../lib/audit.js";
 import type { AuthHooks } from "../lib/auth.js";
 import { httpError } from "../lib/errors.js";
+import { assertCanAddSocialAccount } from "../lib/plan.js";
 import { saveAccountTokens } from "../lib/tokens.js";
 
 const STATE_TTL_SECONDS = 600;
@@ -46,6 +47,7 @@ export function registerAuthTikTokRoutes(
     async (req) => {
       const { client_id } = req.query;
       await assertClientAccess(deps, req.auth!, client_id);
+      await assertCanAddSocialAccount(deps, req.auth!.orgId); // limite do plano
 
       const state = generateState();
       const payload: StatePayload = {
