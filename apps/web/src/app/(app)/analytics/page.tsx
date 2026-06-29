@@ -1,10 +1,9 @@
 "use client";
 
-// Métricas por conta: seleciona a conta + período, KPIs animados (count-up +
-// delta), gráficos de followers/likes no tempo e views por vídeo. Glassmorphism
-// + framer-motion. Dados: /analytics/overview e /analytics/accounts/:id.
+// Métricas por conta: período (7/30/90 + custom por datas), KPIs animados,
+// gráficos, export CSV/PDF e comparativo entre contas. Glass + framer-motion.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Area,
@@ -12,38 +11,52 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { Eye, Heart, MessageCircle, Users, Video } from "lucide-react";
+import { Download, Eye, GitCompare, Heart, MessageCircle, Printer, Users, Video } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { Overview, Snapshot } from "@/lib/types";
 import { Banner, EmptyState, Spinner } from "@/components/ui";
 import { CountUp, GlassCard, KpiCard, Segmented, compact, full } from "@/components/analytics/ui";
 
+type Period = "7" | "30" | "90" | "custom";
 const PERIODS = [
-  { value: "7", label: "7 dias" },
-  { value: "30", label: "30 dias" },
-  { value: "90", label: "90 dias" },
+  { value: "7", label: "7d" },
+  { value: "30", label: "30d" },
+  { value: "90", label: "90d" },
+  { value: "custom", label: "Custom" },
 ] as const;
 
-const tooltipStyle = {
-  background: "#13131a",
-  border: "1px solid #26263a",
-  borderRadius: 10,
-  color: "#e5e7eb",
-  fontSize: 12,
-};
+const COMPARE_COLORS = ["#3b82f6", "#d946ef", "#8b5cf6", "#22d3ee", "#f59e0b", "#10b981"];
+const tooltipStyle = { background: "#13131a", border: "1px solid #26263a", borderRadius: 10, color: "#e5e7eb", fontSize: 12 };
 
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [accountId, setAccountId] = useState("");
-  const [days, setDays] = useState<(typeof PERIODS)[number]["value"]>("30");
+  const [period, setPeriod] = useState<Period>("30");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [snapshots, setSnapshots] = useState<Snapshot[] | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [compareSnaps, setCompareSnaps] = useState<Record<string, Snapshot[]>>({});
   const [error, setError] = useState<string | null>(null);
+
+  const rangeQuery = useCallback(() => {
+    if (period === "custom" && from && to) {
+      const f = new Date(`${from}T00:00:00`).toISOString();
+      const t = new Date(`${to}T23:59:59`).toISOString();
+      return `from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`;
+    }
+    return `days=${period === "custom" ? "30" : period}`;
+  }, [period, from, to]);
 
   useEffect(() => {
     apiFetch<Overview>("/analytics/overview")
@@ -54,17 +67,32 @@ export default function AnalyticsPage() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
+  // série da conta única
   useEffect(() => {
-    if (!accountId) return;
+    if (!accountId || compareMode) return;
+    if (period === "custom" && (!from || !to)) return;
     setSnapshots(null);
-    apiFetch<{ snapshots: Snapshot[] }>(`/analytics/accounts/${accountId}?days=${days}`)
+    apiFetch<{ snapshots: Snapshot[] }>(`/analytics/accounts/${accountId}?${rangeQuery()}`)
       .then((r) => setSnapshots(r.snapshots))
       .catch((e: Error) => setError(e.message));
-  }, [accountId, days]);
+  }, [accountId, compareMode, period, from, to, rangeQuery]);
+
+  // séries das contas em comparação
+  useEffect(() => {
+    if (!compareMode || compareIds.length === 0) return;
+    if (period === "custom" && (!from || !to)) return;
+    Promise.all(
+      compareIds.map((id) =>
+        apiFetch<{ snapshots: Snapshot[] }>(`/analytics/accounts/${id}?${rangeQuery()}`)
+          .then((r) => [id, r.snapshots] as const)
+          .catch(() => [id, [] as Snapshot[]] as const),
+      ),
+    ).then((pairs) => setCompareSnaps(Object.fromEntries(pairs)));
+  }, [compareMode, compareIds, period, from, to, rangeQuery]);
 
   const account = overview?.accounts.find((a) => a.id === accountId) ?? null;
+  const nameOf = (id: string) => overview?.accounts.find((a) => a.id === id)?.display_name ?? id.slice(0, 6);
 
-  // KPIs + deltas a partir dos snapshots do período
   const kpi = useMemo(() => {
     const snaps = snapshots ?? [];
     const first = snaps[0];
@@ -91,9 +119,40 @@ export default function AnalyticsPage() {
       (overview?.top_videos ?? [])
         .filter((v) => v.social_account_id === accountId)
         .slice(0, 8)
-        .map((v, i) => ({ name: `#${i + 1}`, views: v.views, likes: v.likes, url: v.post_url })),
+        .map((v, i) => ({ name: `#${i + 1}`, views: v.views, likes: v.likes })),
     [overview, accountId],
   );
+
+  // dataset combinado p/ comparativo (followers por data, 1 série por conta)
+  const compareChart = useMemo(() => {
+    const byDate = new Map<string, Record<string, number | string>>();
+    for (const id of compareIds) {
+      const key = nameOf(id);
+      for (const s of compareSnaps[id] ?? []) {
+        const d = formatDate(s.captured_at);
+        const row = byDate.get(d) ?? { date: d };
+        row[key] = s.followers;
+        byDate.set(d, row);
+      }
+    }
+    return [...byDate.values()];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareSnaps, compareIds]);
+
+  function exportCsv() {
+    const rows = [["data", "seguidores", "curtidas"], ...(snapshots ?? []).map((s) => [formatDate(s.captured_at), String(s.followers), String(s.likes)])];
+    const csv = rows.map((r) => r.join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `metricas-${account?.display_name ?? "conta"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function toggleCompare(id: string) {
+    setCompareIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   if (error) return <Banner kind="error">{error}</Banner>;
   if (!overview)
@@ -105,33 +164,65 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-2xl font-bold">
             Métricas <span className="text-gradient">por conta</span>
           </h1>
           <p className="mt-1 text-sm text-ink-dim">Coletadas automaticamente a cada 6 horas.</p>
         </div>
-        {account && <Segmented options={PERIODS} value={days} onChange={setDays} />}
+        {overview.accounts.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Segmented options={PERIODS} value={period} onChange={setPeriod} />
+            {period === "custom" && (
+              <div className="flex items-center gap-1">
+                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-border-subtle bg-surface px-2 py-1 text-xs text-ink" aria-label="Data início" />
+                <span className="text-ink-faint">–</span>
+                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-border-subtle bg-surface px-2 py-1 text-xs text-ink" aria-label="Data fim" />
+              </div>
+            )}
+            <button
+              onClick={() => setCompareMode((c) => !c)}
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${compareMode ? "border-lumix-purple bg-lumix-purple/15 text-ink" : "border-border-subtle text-ink-dim hover:text-ink"}`}
+            >
+              <GitCompare className="size-3.5" /> Comparar
+            </button>
+            {!compareMode && (
+              <>
+                <button onClick={exportCsv} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-xs text-ink-dim transition-colors hover:text-ink">
+                  <Download className="size-3.5" /> CSV
+                </button>
+                <button onClick={() => window.print()} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-xs text-ink-dim transition-colors hover:text-ink">
+                  <Printer className="size-3.5" /> PDF
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {overview.accounts.length === 0 ? (
         <EmptyState title="Nenhuma conta conectada" hint="Conecte uma conta TikTok para começar a coletar métricas." />
+      ) : compareMode ? (
+        <CompareView
+          accounts={overview.accounts}
+          selected={compareIds}
+          onToggle={toggleCompare}
+          chart={compareChart}
+          compareSnaps={compareSnaps}
+          nameOf={nameOf}
+        />
       ) : (
         <>
-          {/* seletor de conta (pills com avatar) */}
-          <div className="flex flex-wrap gap-2">
+          {/* seletor de conta */}
+          <div className="flex flex-wrap gap-2 print:hidden">
             {overview.accounts.map((a) => {
               const active = a.id === accountId;
               return (
                 <button
                   key={a.id}
                   onClick={() => setAccountId(a.id)}
-                  className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                    active
-                      ? "border-lumix-purple bg-lumix-purple/15 text-ink"
-                      : "border-border-subtle text-ink-dim hover:border-ink-faint hover:text-ink"
-                  }`}
+                  className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${active ? "border-lumix-purple bg-lumix-purple/15 text-ink" : "border-border-subtle text-ink-dim hover:border-ink-faint hover:text-ink"}`}
                 >
                   {a.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -145,7 +236,6 @@ export default function AnalyticsPage() {
             })}
           </div>
 
-          {/* KPIs */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <KpiCard icon={Users} label="Seguidores" value={kpi.followers} delta={kpi.followersDelta} accent="#3b82f6" index={0} />
             <KpiCard icon={Heart} label="Curtidas (conta)" value={kpi.likes} delta={kpi.likesDelta} accent="#d946ef" index={1} />
@@ -154,13 +244,11 @@ export default function AnalyticsPage() {
             <KpiCard icon={MessageCircle} label="Comentários" value={kpi.comments} accent="#f59e0b" index={4} />
           </div>
 
-          {/* gráficos de série temporal */}
           <div className="grid gap-4 lg:grid-cols-2">
             <ChartCard title="Seguidores no tempo" color="#3b82f6" gradId="g-fol" data={chartData} dataKey="followers" loading={!snapshots} delay={0.1} />
             <ChartCard title="Curtidas no tempo" color="#d946ef" gradId="g-lik" data={chartData} dataKey="likes" loading={!snapshots} delay={0.16} />
           </div>
 
-          {/* views por vídeo */}
           <GlassCard className="p-5" delay={0.2}>
             <h2 className="mb-4 font-semibold">Views por vídeo (top da conta)</h2>
             {videoBars.length === 0 ? (
@@ -174,6 +262,103 @@ export default function AnalyticsPage() {
                   <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => full(v)} cursor={{ fill: "#8b5cf615" }} />
                   <Bar dataKey="views" radius={[6, 6, 0, 0]} fill="#8b5cf6" />
                 </BarChart>
+              </ResponsiveContainer>
+            )}
+          </GlassCard>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ───────── comparativo entre contas ───────── */
+function CompareView({
+  accounts,
+  selected,
+  onToggle,
+  chart,
+  compareSnaps,
+  nameOf,
+}: {
+  accounts: Overview["accounts"];
+  selected: string[];
+  onToggle: (id: string) => void;
+  chart: Array<Record<string, number | string>>;
+  compareSnaps: Record<string, Snapshot[]>;
+  nameOf: (id: string) => string;
+}) {
+  return (
+    <div className="space-y-4">
+      <GlassCard className="p-4">
+        <p className="mb-2 text-xs font-semibold uppercase text-ink-faint">Selecione contas para comparar</p>
+        <div className="flex flex-wrap gap-2">
+          {accounts.map((a) => {
+            const i = selected.indexOf(a.id);
+            const on = i >= 0;
+            return (
+              <button
+                key={a.id}
+                onClick={() => onToggle(a.id)}
+                className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors"
+                style={{ borderColor: on ? COMPARE_COLORS[i % COMPARE_COLORS.length] : "#26263a", color: on ? "#e5e7eb" : "#9ca3af", background: on ? `${COMPARE_COLORS[i % COMPARE_COLORS.length]}1f` : "transparent" }}
+              >
+                <span className="size-2.5 rounded-full" style={{ background: on ? COMPARE_COLORS[i % COMPARE_COLORS.length] : "#3a3a4a" }} />
+                {a.display_name ?? "Conta TikTok"}
+              </button>
+            );
+          })}
+        </div>
+      </GlassCard>
+
+      {selected.length === 0 ? (
+        <EmptyState title="Escolha pelo menos uma conta" hint="Selecione 2 ou mais para comparar lado a lado." />
+      ) : (
+        <>
+          {/* KPI por conta */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {selected.map((id, i) => {
+              const snaps = compareSnaps[id] ?? [];
+              const first = snaps[0];
+              const last = snaps[snaps.length - 1];
+              const color = COMPARE_COLORS[i % COMPARE_COLORS.length]!;
+              return (
+                <GlassCard key={id} className="p-5" delay={i * 0.05}>
+                  <div className="flex items-center gap-2">
+                    <span className="size-3 rounded-full" style={{ background: color }} />
+                    <p className="truncate text-sm font-medium">{nameOf(id)}</p>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold tracking-tight">
+                    <CountUp value={last?.followers ?? 0} />
+                  </p>
+                  <p className="text-xs text-ink-dim">
+                    seguidores ·{" "}
+                    <span className={first && last && last.followers - first.followers >= 0 ? "text-emerald-300" : "text-red-300"}>
+                      {first && last ? (last.followers - first.followers >= 0 ? "+" : "") + full(last.followers - first.followers) : "—"}
+                    </span>{" "}
+                    no período
+                  </p>
+                </GlassCard>
+              );
+            })}
+          </div>
+
+          {/* gráfico sobreposto */}
+          <GlassCard className="p-5" delay={0.1}>
+            <h2 className="mb-4 font-semibold">Seguidores — comparativo</h2>
+            {chart.length < 2 ? (
+              <div className="flex h-[280px] items-center justify-center text-sm text-ink-faint">Histórico insuficiente para comparar.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chart}>
+                  <CartesianGrid stroke="#26263a" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="date" stroke="#6b7280" fontSize={12} minTickGap={24} />
+                  <YAxis stroke="#6b7280" fontSize={12} width={48} tickFormatter={compact} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => full(v)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {selected.map((id, i) => (
+                    <Line key={id} type="monotone" dataKey={nameOf(id)} stroke={COMPARE_COLORS[i % COMPARE_COLORS.length]} strokeWidth={2} dot={false} animationDuration={700} />
+                  ))}
+                </LineChart>
               </ResponsiveContainer>
             )}
           </GlassCard>
