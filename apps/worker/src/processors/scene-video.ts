@@ -5,7 +5,7 @@ import type { Job } from "bullmq";
 import { KieError } from "@lsm/shared/kie";
 import { toBullJobId, type SceneVideoJobData, type ScenePollJobData } from "@lsm/shared";
 import type { WorkerDeps } from "../deps.js";
-import { loadRunContext, logStep } from "../lib/auto-runtime.js";
+import { finalizeRunIfDone, loadRunContext, logStep } from "../lib/auto-runtime.js";
 import { withRetry } from "../lib/retry.js";
 
 const POLL_DELAY_MS = 20_000;
@@ -81,6 +81,7 @@ export function createSceneVideoProcessor(deps: WorkerDeps) {
           .update({ status: "failed", error: `cena ${scene.idx} falhou: ${(e as Error).message}`.slice(0, 500) })
           .eq("id", scene.video_id)
           .neq("status", "published");
+        await finalizeRunIfDone(deps, run.id); // não vaza inflight
       } else {
         // política "continuar": segue best-effort (junta as cenas que deram certo)
         const { maybeEnqueueStitch } = await import("../lib/auto-runtime.js");

@@ -11,7 +11,7 @@ import {
   type SceneVideoJobData,
 } from "@lsm/shared";
 import type { WorkerDeps } from "../deps.js";
-import { loadRunContext, logStep } from "../lib/auto-runtime.js";
+import { finalizeRunIfDone, loadRunContext, logStep } from "../lib/auto-runtime.js";
 import { withRetry } from "../lib/retry.js";
 
 function hashNum(s: string): number {
@@ -53,6 +53,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
 
     if (!key) {
       await deps.db.from("automation_videos").update({ status: "failed", error: "sem KIE_API_KEY" }).eq("id", video.id);
+      await finalizeRunIfDone(deps, video.run_id); // não vaza inflight
       return;
     }
 
@@ -100,6 +101,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     } catch (e) {
       await deps.db.from("automation_videos").update({ status: "failed", error: `diretor: ${(e as Error).message}`.slice(0, 500) }).eq("id", video.id);
       await logStep(deps, run, `script:${video.id}`, "failed");
+      await finalizeRunIfDone(deps, video.run_id); // não vaza inflight
       return;
     }
 
