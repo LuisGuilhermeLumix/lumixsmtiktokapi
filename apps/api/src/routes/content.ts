@@ -353,6 +353,56 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
     },
   );
 
+  // pausar/retomar a esteira (kill-switch — ela gasta créditos)
+  r.patch(
+    "/automations/:id",
+    {
+      preHandler: [auth.authenticate],
+      schema: {
+        tags: ["studio"],
+        description: "Pausa/retoma uma automação (esteira)",
+        params: z.object({ id: z.string().uuid() }),
+        body: z.object({ status: z.enum(["active", "paused"]) }),
+      },
+    },
+    async (req) => {
+      const { data, error } = await deps.db
+        .from("content_automations")
+        .update({ status: req.body.status })
+        .eq("id", req.params.id)
+        .eq("org_id", req.auth!.orgId)
+        .select("*")
+        .maybeSingle();
+      if (error) throw httpError(500, error.message);
+      if (!data) throw httpError(404, "Automação não encontrada");
+      return { automation: data };
+    },
+  );
+
+  r.delete(
+    "/automations/:id",
+    {
+      preHandler: [auth.authenticate],
+      schema: {
+        tags: ["studio"],
+        description: "Remove uma automação (esteira)",
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (req, reply) => {
+      const { data, error } = await deps.db
+        .from("content_automations")
+        .delete()
+        .eq("id", req.params.id)
+        .eq("org_id", req.auth!.orgId)
+        .select("id")
+        .maybeSingle();
+      if (error) throw httpError(500, error.message);
+      if (!data) throw httpError(404, "Automação não encontrada");
+      return reply.code(204).send();
+    },
+  );
+
   // ───────────── webhook kie.ai (público) ─────────────
   app.post<{ Querystring: { secret?: string } }>(
     "/webhooks/kie",

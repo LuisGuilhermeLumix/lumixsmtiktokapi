@@ -81,6 +81,11 @@ export default function LoginPage() {
           </Suspense>
         </div>
         <p className="mt-4 text-center text-xs text-ink-faint">
+          <Link href="/forgot-password" className="text-lumix-blue hover:underline">
+            Esqueci minha senha
+          </Link>
+        </p>
+        <p className="mt-1 text-center text-xs text-ink-faint">
           Não tem conta?{" "}
           <Link href="/signup" className="text-lumix-blue hover:underline">
             Criar conta grátis
