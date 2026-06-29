@@ -2,7 +2,6 @@
 // a legenda; seleciona o hook do niche pack (rotação) e cria as cenas.
 
 import type { Job } from "bullmq";
-import { kieLLM } from "@lsm/shared/kie";
 import { resolveExpressions } from "@lsm/shared/automation";
 import { selectHook, sanitizeText } from "@lsm/shared/niche";
 import {
@@ -89,8 +88,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     try {
       script = await withRetry(
         () =>
-          kieLLM(
-            key,
+          deps.provider.llm(
             llm,
             `${directorPrompt}\n\nNicho: ${niche}\n${charNote}\n` +
               (hook ? `Comece com o gancho: "${hook.text}".\n` : "") +
@@ -108,8 +106,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     // legenda
     let caption = "";
     try {
-      caption = await kieLLM(
-        key,
+      caption = await deps.provider.llm(
         llm,
         `${captionPrompt}\n\nNicho: ${niche}\nGere a legenda final para TikTok (curta, 2-3 hashtags).`,
       );

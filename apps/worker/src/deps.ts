@@ -27,12 +27,14 @@ import {
 } from "@lsm/shared";
 import type { TikTokOAuthConfig } from "@lsm/tiktok";
 import type { WorkerConfig } from "./config.js";
+import { createProvider, type GenerationProvider } from "./providers/index.js";
 
 export interface WorkerDeps {
   config: WorkerConfig;
   tiktok: TikTokOAuthConfig;
   db: Db;
   redis: Redis;
+  provider: GenerationProvider;
   queues: {
     publish: Queue<PublishJobData>;
     status: Queue<StatusJobData>;
@@ -71,6 +73,7 @@ export function createDeps(config: WorkerConfig): WorkerDeps {
     },
     db: createServiceClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY),
     redis,
+    provider: createProvider(config.KIE_API_KEY),
     queues: {
       publish: new Queue<PublishJobData>(QUEUE_PUBLISH, { connection: redis, defaultJobOptions }),
       status: new Queue<StatusJobData>(QUEUE_STATUS, { connection: redis, defaultJobOptions }),
