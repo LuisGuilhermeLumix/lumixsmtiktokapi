@@ -25,6 +25,27 @@ const PROVIDER = [
   { value: "magichour", label: "Magic Hour" },
 ];
 
+// Modelos de imagem (kie.ai) p/ as cenas
+const IMAGE_MODELS_OPTS = [
+  "google/nano-banana",
+  "google/imagen-4",
+  "ideogram/v3",
+  "qwen/image",
+  "recraft/v3",
+  "flux-2",
+].map((m) => ({ value: m, label: m }));
+
+// Modelos de vídeo (kie.ai) p/ a geração das cenas
+const VIDEO_MODELS_OPTS = [
+  "veo3_fast",
+  "veo3",
+  "veo3_lite",
+  "sora2",
+  "kling/v2",
+  "bytedance/seedance-v1-pro",
+  "minimax/hailuo-02",
+].map((m) => ({ value: m, label: m }));
+
 // Modelos LLM (OpenAI) disponíveis para os agentes da automação.
 const OPENAI_MODELS = [
   "gpt-4.1",
@@ -91,12 +112,12 @@ export const NODE_FIELDS: Record<NodeType, FieldSpec[]> = {
   SafetyFilter: [{ key: "banned_terms", label: "Termos banidos", type: "stringList", placeholder: "celebrity, real person" }],
   SceneImage: [
     { key: "provider", label: "Provider", type: "select", options: PROVIDER, default: "kie" },
-    { key: "model", label: "Modelo", type: "text", default: "google/nano-banana" },
+    { key: "model", label: "Modelo", type: "select", options: IMAGE_MODELS_OPTS, default: "google/nano-banana" },
     { key: "aspect_ratio", label: "Proporção", type: "select", options: ASPECT, default: "9:16" },
   ],
   VideoGen: [
     { key: "provider", label: "Provider", type: "select", options: PROVIDER, default: "kie" },
-    { key: "model", label: "Modelo", type: "text", default: "veo3_fast" },
+    { key: "model", label: "Modelo", type: "select", options: VIDEO_MODELS_OPTS, default: "veo3_fast" },
     { key: "duration_per_scene", label: "Duração por cena (s)", type: "slider", min: 2, max: 60, default: 8 },
     { key: "aspect_ratio", label: "Proporção", type: "select", options: ASPECT, default: "9:16" },
   ],
