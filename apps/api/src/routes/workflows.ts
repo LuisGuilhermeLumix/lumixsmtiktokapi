@@ -314,6 +314,54 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
     },
   );
 
+  // cancela um run em andamento: estorna o reservado-não-usado e marca terminal
+  r.post(
+    "/runs/:id/cancel",
+    {
+      preHandler: [auth.authenticate],
+      schema: { tags: ["automation"], description: "Cancela um run de automação", params: z.object({ id: z.string().min(1) }) },
+    },
+    async (req) => {
+      const { data: run } = await deps.db
+        .from("automation_runs")
+        .select("id, org_id, status, credits_reserved, credits_settled")
+        .eq("id", req.params.id)
+        .eq("org_id", req.auth!.orgId)
+        .maybeSingle();
+      if (!run) throw httpError(404, "Run não encontrado");
+      if (["done", "failed", "partial", "skipped"].includes(run.status)) {
+        return { run_id: run.id, status: run.status }; // já terminou
+      }
+
+      // estorna créditos reservados ainda não usados (idempotente via credits_settled)
+      if (run.credits_settled === 0) {
+        const { data: vids } = await deps.db.from("automation_videos").select("id").eq("run_id", run.id);
+        const ids = (vids ?? []).map((v) => v.id);
+        let used = 0;
+        if (ids.length) {
+          const { data: scenes } = await deps.db.from("automation_scenes").select("credits_charged").in("video_id", ids);
+          used = (scenes ?? []).reduce((s, sc) => s + (sc.credits_charged ?? 0), 0);
+        }
+        const refund = run.credits_reserved - used;
+        if (refund > 0) {
+          await deps.db.rpc("refund_credits", { p_org: run.org_id, p_amount: refund, p_reason: `automation_cancel:${run.id}` });
+        }
+        await deps.db.from("automation_runs").update({ credits_settled: used }).eq("id", run.id);
+      }
+
+      // marca terminal: run + vídeos/cenas não-terminais
+      await deps.db.from("automation_runs").update({ status: "failed", error: "Cancelado pelo usuário" }).eq("id", run.id);
+      const { data: vids2 } = await deps.db.from("automation_videos").select("id").eq("run_id", run.id);
+      const ids2 = (vids2 ?? []).map((v) => v.id);
+      if (ids2.length) {
+        await deps.db.from("automation_videos").update({ status: "failed", error: "cancelado" }).eq("run_id", run.id).neq("status", "published");
+        await deps.db.from("automation_scenes").update({ status: "failed", error: "cancelado" }).in("video_id", ids2).not("status", "in", "(done,failed)");
+      }
+      logAudit(deps, { orgId: req.auth!.orgId, userId: req.auth!.userId, action: "automation.run_cancel", entity: `run:${run.id}` });
+      return { run_id: run.id, status: "failed" };
+    },
+  );
+
   // detalhe de um run (videos + steps)
   r.get(
     "/runs/:id",
