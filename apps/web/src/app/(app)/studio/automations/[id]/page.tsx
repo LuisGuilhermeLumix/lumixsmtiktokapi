@@ -98,6 +98,7 @@ export default function AutomationEditor() {
   const [nodeStatus, setNodeStatus] = useState<Record<string, RunStatus>>({});
   const [runId, setRunId] = useState<string | null>(null);
   const [execOpen, setExecOpen] = useState(false);
+  const [estimate, setEstimate] = useState<{ estimate: { maxCredits: number; minCredits: number }; current_balance: number; sufficient: boolean } | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [showRuns, setShowRuns] = useState(false);
   const [inspectRunId, setInspectRunId] = useState<string | null>(null);
@@ -106,6 +107,12 @@ export default function AutomationEditor() {
 
   const loadRuns = useCallback(() => {
     apiFetch<{ runs: Run[] }>(`/workflows/${id}/runs`).then((r) => setRuns(r.runs)).catch(() => setRuns([]));
+  }, [id]);
+
+  const loadEstimate = useCallback(() => {
+    apiFetch<{ estimate: { maxCredits: number; minCredits: number }; current_balance: number; sufficient: boolean }>(`/workflows/${id}/cost-estimate`)
+      .then(setEstimate)
+      .catch(() => setEstimate(null));
   }, [id]);
 
   useEffect(() => {
@@ -345,6 +352,12 @@ export default function AutomationEditor() {
           <div className="absolute bottom-5 left-1/2 z-20 -translate-x-1/2">
             {execOpen && (
               <div className="absolute bottom-full left-1/2 mb-2 w-64 -translate-x-1/2 rounded-lg border border-border-subtle bg-surface-raised p-1 shadow-2xl">
+                {estimate && (
+                  <div className={`mb-1 rounded-md px-2 py-1.5 text-[11px] ${estimate.sufficient ? "bg-surface-overlay text-ink-dim" : "bg-red-500/10 text-red-300"}`}>
+                    Custo estimado: <b className="text-ink">{estimate.estimate.maxCredits}</b> créditos · saldo {estimate.current_balance}
+                    {!estimate.sufficient && <span className="mt-0.5 block">⚠ Saldo insuficiente</span>}
+                  </div>
+                )}
                 <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-ink-faint">Executar a partir de</p>
                 {triggers.map((t, i) => (
                   <button
@@ -377,7 +390,7 @@ export default function AutomationEditor() {
                 </span>
               </button>
               <button
-                onClick={() => setExecOpen((o) => !o)}
+                onClick={() => setExecOpen((o) => { const next = !o; if (next) loadEstimate(); return next; })}
                 disabled={busy}
                 aria-label="Opções de execução"
                 className="flex items-center bg-lumix-magenta px-2 text-white transition hover:brightness-110 disabled:opacity-60"

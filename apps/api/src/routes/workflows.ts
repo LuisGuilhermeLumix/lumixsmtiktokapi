@@ -7,10 +7,12 @@ import { z } from "zod";
 import {
   AUTOMATION_TEMPLATES,
   compileWorkflow,
+  estimateRunCost,
   getTemplate,
   type AutomationGraph,
 } from "@lsm/shared/automation";
 import { automationRunId, toBullJobId } from "@lsm/shared";
+import { creditsForModel } from "@lsm/shared/kie";
 import type { Json, TablesUpdate } from "@lsm/db";
 import type { ApiDeps } from "../deps.js";
 import { assertClientAccess } from "../lib/access.js";
@@ -314,6 +316,74 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
       const result = { run_id: runId };
       if (idemKey) await idemSet(deps, req.auth!.orgId, idemKey, result);
       return result;
+    },
+  );
+
+  // estimativa de custo (créditos) antes de executar
+  r.get(
+    "/workflows/:id/cost-estimate",
+    { preHandler: [auth.authenticate], schema: { tags: ["automation"], params: uuidParam } },
+    async (req) => {
+      const wf = await load(req.auth!.orgId, req.params.id);
+      if (!wf) throw httpError(404, "Workflow não encontrado");
+      const c = compileWorkflow(wf.id, wf.graph as unknown as AutomationGraph);
+      if (!c.ok) throw httpError(400, `Grafo inválido: ${c.errors.join(" | ")}`);
+      const config = c.plan.config!;
+
+      // nº de contas-alvo (config fixa ou contas conectadas do client/org)
+      let accounts = config.account_ids.length;
+      if (!accounts) {
+        let clientIds: string[] = [];
+        if (wf.client_id) clientIds = [wf.client_id];
+        else {
+          const { data: clients } = await deps.db.from("clients").select("id").eq("org_id", wf.org_id);
+          clientIds = (clients ?? []).map((cl) => cl.id);
+        }
+        if (clientIds.length) {
+          const { count } = await deps.db
+            .from("social_accounts")
+            .select("id", { count: "exact", head: true })
+            .in("client_id", clientIds)
+            .eq("status", "connected");
+          accounts = count ?? 0;
+        }
+      }
+
+      const perScene =
+        config.credits_per_scene > 0
+          ? config.credits_per_scene
+          : creditsForModel(config.video_model, config.duration_per_scene, deps.config.CREDIT_MARKUP);
+      const est = estimateRunCost({
+        accounts,
+        videosPerAccount: config.videos_per_account,
+        numScenes: config.num_scenes,
+        creditsPerScene: perScene,
+      });
+
+      const { data: org } = await deps.db
+        .from("organizations")
+        .select("credits_balance")
+        .eq("id", req.auth!.orgId)
+        .maybeSingle();
+      const balance = org?.credits_balance ?? 0;
+
+      return {
+        estimate: {
+          maxCredits: est.maxCredits,
+          minCredits: config.on_error === "continue" ? 0 : est.maxCredits,
+        },
+        breakdown: {
+          accounts,
+          videos_per_account: config.videos_per_account,
+          scenes_per_video: config.num_scenes,
+          credits_per_scene: perScene,
+          videos: est.videos,
+          scenes: est.scenes,
+          markup: deps.config.CREDIT_MARKUP,
+        },
+        current_balance: balance,
+        sufficient: balance >= est.maxCredits,
+      };
     },
   );
 
