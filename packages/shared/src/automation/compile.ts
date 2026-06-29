@@ -94,6 +94,9 @@ export function compileWorkflow(workflowId: string, graph: AutomationGraph): Com
     stitch_mode: (stitch as { mode?: "montage" | "monologue" }).mode ?? "montage",
     best_effort_stitch: (stitch as { best_effort?: boolean }).best_effort ?? true,
     privacy_level: (publish as { privacy_level?: string }).privacy_level ?? "PUBLIC_TO_EVERYONE",
+    on_error: (director as { on_error?: "stop" | "continue" }).on_error ?? "stop",
+    max_tries: (director as { max_tries?: number }).max_tries ?? 2,
+    retry_wait_s: (director as { retry_wait_s?: number }).retry_wait_s ?? 5,
   });
 
   const scheduleParsed = NODE_CONFIG_SCHEMAS.Schedule.parse(sched);

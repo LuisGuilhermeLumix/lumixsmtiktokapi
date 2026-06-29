@@ -3,6 +3,7 @@
 
 import type { Job } from "bullmq";
 import { kieLLM } from "@lsm/shared/kie";
+import { resolveExpressions } from "@lsm/shared/automation";
 import { selectHook, sanitizeText } from "@lsm/shared/niche";
 import {
   automationSceneId,
@@ -12,6 +13,7 @@ import {
 } from "@lsm/shared";
 import type { WorkerDeps } from "../deps.js";
 import { loadRunContext, logStep } from "../lib/auto-runtime.js";
+import { withRetry } from "../lib/retry.js";
 
 function hashNum(s: string): number {
   let h = 0;
@@ -62,16 +64,40 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     const niche = config.niche_pack_id ?? "";
     const charNote = ctx.character ? `Personagem (fictício): ${ctx.character.name} — ${ctx.character.description}.` : "";
 
+    // contexto de expressões {{ }} (estilo n8n) — resolve nos prompts
+    let acctName: string | null = null;
+    if (video.social_account_id) {
+      const { data: acct } = await deps.db
+        .from("social_accounts")
+        .select("display_name")
+        .eq("id", video.social_account_id)
+        .maybeSingle();
+      acctName = acct?.display_name ?? null;
+    }
+    const exprCtx = {
+      now: new Date().toISOString(),
+      niche,
+      account: { display_name: acctName, name: acctName },
+      character: ctx.character ? { name: ctx.character.name, description: ctx.character.description } : undefined,
+      video: { idx: video.idx },
+    };
+    const directorPrompt = resolveExpressions(config.director_prompt, exprCtx);
+    const captionPrompt = resolveExpressions(config.caption_prompt, exprCtx);
+
     // agente diretor → roteiro
     let script: string;
     try {
-      script = await kieLLM(
-        key,
-        llm,
-        `${config.director_prompt}\n\nNicho: ${niche}\n${charNote}\n` +
-          (hook ? `Comece com o gancho: "${hook.text}".\n` : "") +
-          `Escreva um roteiro de vídeo curto para TikTok dividido em ${config.num_scenes} cena(s), ` +
-          `cada cena uma frase visual descritiva (em inglês), uma por linha.`,
+      script = await withRetry(
+        () =>
+          kieLLM(
+            key,
+            llm,
+            `${directorPrompt}\n\nNicho: ${niche}\n${charNote}\n` +
+              (hook ? `Comece com o gancho: "${hook.text}".\n` : "") +
+              `Escreva um roteiro de vídeo curto para TikTok dividido em ${config.num_scenes} cena(s), ` +
+              `cada cena uma frase visual descritiva (em inglês), uma por linha.`,
+          ),
+        { tries: config.max_tries, waitMs: config.retry_wait_s * 1000 },
       );
     } catch (e) {
       await deps.db.from("automation_videos").update({ status: "failed", error: `diretor: ${(e as Error).message}`.slice(0, 500) }).eq("id", video.id);
@@ -85,7 +111,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
       caption = await kieLLM(
         key,
         llm,
-        `${config.caption_prompt}\n\nNicho: ${niche}\nGere a legenda final para TikTok (curta, 2-3 hashtags).`,
+        `${captionPrompt}\n\nNicho: ${niche}\nGere a legenda final para TikTok (curta, 2-3 hashtags).`,
       );
     } catch {
       caption = hook?.text ?? "";

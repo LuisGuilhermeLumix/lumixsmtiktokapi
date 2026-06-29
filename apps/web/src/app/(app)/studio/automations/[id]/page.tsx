@@ -19,11 +19,12 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Play } from "lucide-react";
+import { Ban, Play } from "lucide-react";
 import { NODE_CATEGORY, NODE_TYPES, type NodeType } from "@lsm/shared/automation";
 import { apiFetch } from "@/lib/api";
 import { defaultConfig } from "@/lib/automation-fields";
 import { EditorProvider, LsmNode, type EditorData, type LsmNodeData } from "@/components/automation/automation-node";
+import { RunInspector } from "@/components/automation/run-inspector";
 import { Banner, Button } from "@/components/ui";
 
 type FlowNode = Node<LsmNodeData, "lsm">;
@@ -99,6 +100,7 @@ export default function AutomationEditor() {
   const [execOpen, setExecOpen] = useState(false);
   const [runs, setRuns] = useState<Run[]>([]);
   const [showRuns, setShowRuns] = useState(false);
+  const [inspectRunId, setInspectRunId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -215,6 +217,17 @@ export default function AutomationEditor() {
       });
     return [...sched, "Manual (agora)"];
   }, [nodes]);
+
+  async function cancelRun(rid: string) {
+    try {
+      await apiFetch(`/runs/${rid}/cancel`, { method: "POST" });
+      if (runId === rid) setRunId(null);
+      loadRuns();
+      setMsg({ kind: "info", text: "Run cancelado." });
+    } catch (e) {
+      setMsg({ kind: "error", text: (e as Error).message });
+    }
+  }
 
   // animação simulada (sem backend) — só para visualizar o fluxo nó-a-nó
   function runDemo() {
@@ -352,21 +365,43 @@ export default function AutomationEditor() {
               <p className="text-xs font-semibold uppercase text-ink-faint">Runs recentes</p>
               <button onClick={loadRuns} className="text-xs text-lumix-blue hover:underline">↻</button>
             </div>
+            {runs.some((r) => !["done", "failed", "partial", "skipped"].includes(r.status)) && (
+              <button
+                onClick={() => runs.filter((r) => !["done", "failed", "partial", "skipped"].includes(r.status)).forEach((r) => cancelRun(r.id))}
+                className="w-full rounded-md border border-red-600/40 bg-red-600/10 px-2 py-1 text-xs text-red-300 hover:bg-red-600/20"
+              >
+                Cancelar todos em execução
+              </button>
+            )}
             {runs.length === 0 ? (
               <p className="text-xs text-ink-faint">Nenhum run ainda.</p>
             ) : (
               <ul className="space-y-1 text-xs">
-                {runs.slice(0, 20).map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-2 rounded border border-border-subtle px-2 py-1">
-                    <span className="truncate text-ink-dim">{r.slot}</span>
-                    <span className={r.status === "done" ? "text-emerald-300" : r.status === "failed" ? "text-red-400" : "text-ink-faint"}>{r.status}</span>
-                  </li>
-                ))}
+                {runs.slice(0, 20).map((r) => {
+                  const running = !["done", "failed", "partial", "skipped"].includes(r.status);
+                  return (
+                    <li key={r.id} className="flex items-center justify-between gap-2 rounded border border-border-subtle px-2 py-1">
+                      <button onClick={() => setInspectRunId(r.id)} title="Ver dados gerados" className="truncate text-left text-ink-dim hover:text-ink hover:underline">{r.slot}</button>
+                      <span className="flex items-center gap-1.5">
+                        <span className={r.status === "done" ? "text-emerald-300" : r.status === "failed" ? "text-red-400" : "text-ink-faint"}>{r.status}</span>
+                        {running && (
+                          <button onClick={() => cancelRun(r.id)} title="Cancelar run" className="text-ink-faint hover:text-red-400">
+                            <Ban className="size-3.5" />
+                          </button>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
         )}
       </div>
+
+      {inspectRunId && (
+        <RunInspector runId={inspectRunId} onClose={() => setInspectRunId(null)} onChanged={loadRuns} />
+      )}
     </div>
   );
 }

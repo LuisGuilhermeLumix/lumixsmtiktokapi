@@ -6,6 +6,7 @@ import { kieCreateTask, KieError } from "@lsm/shared/kie";
 import { toBullJobId, type SceneVideoJobData, type ScenePollJobData } from "@lsm/shared";
 import type { WorkerDeps } from "../deps.js";
 import { loadRunContext, logStep } from "../lib/auto-runtime.js";
+import { withRetry } from "../lib/retry.js";
 
 const POLL_DELAY_MS = 20_000;
 
@@ -37,16 +38,24 @@ export function createSceneVideoProcessor(deps: WorkerDeps) {
       : undefined;
 
     try {
-      const taskId = await kieCreateTask(key, {
-        model: config.video_model,
-        input: {
-          prompt: scene.prompt ?? scene.beat ?? "",
-          aspect_ratio: "9:16",
-          duration: config.duration_per_scene,
-          ...(scene.image_url ? { imageUrls: [scene.image_url] } : {}),
+      const taskId = await withRetry(
+        () =>
+          kieCreateTask(key, {
+            model: config.video_model,
+            input: {
+              prompt: scene.prompt ?? scene.beat ?? "",
+              aspect_ratio: "9:16",
+              duration: config.duration_per_scene,
+              ...(scene.image_url ? { imageUrls: [scene.image_url] } : {}),
+            },
+            callBackUrl,
+          }),
+        {
+          tries: config.max_tries,
+          waitMs: config.retry_wait_s * 1000,
+          onAttempt: (attempt, err) => logStep(deps, run, `scene:${scene.id}`, "started", { retry: attempt, error: err.message.slice(0, 200) }),
         },
-        callBackUrl,
-      });
+      );
       await deps.db
         .from("automation_scenes")
         .update({ status: "video", provider: "kie", provider_task_id: taskId, error: null })
@@ -60,14 +69,23 @@ export function createSceneVideoProcessor(deps: WorkerDeps) {
       await logStep(deps, run, `scene:${scene.id}`, "started", { taskId });
     } catch (e) {
       const status = e instanceof KieError ? e.status : 0;
-      // erro imediato → falha a cena (retry/fallback de prompt vem na Fase 4)
       await deps.db
         .from("automation_scenes")
         .update({ status: "failed", error: `kie create [${status}]: ${(e as Error).message}`.slice(0, 500) })
         .eq("id", scene.id);
       await logStep(deps, run, `scene:${scene.id}`, "failed", { status });
-      const { maybeEnqueueStitch } = await import("../lib/auto-runtime.js");
-      await maybeEnqueueStitch(deps, scene.video_id);
+      if (config.on_error === "stop") {
+        // política "parar": derruba o vídeo inteiro
+        await deps.db
+          .from("automation_videos")
+          .update({ status: "failed", error: `cena ${scene.idx} falhou: ${(e as Error).message}`.slice(0, 500) })
+          .eq("id", scene.video_id)
+          .neq("status", "published");
+      } else {
+        // política "continuar": segue best-effort (junta as cenas que deram certo)
+        const { maybeEnqueueStitch } = await import("../lib/auto-runtime.js");
+        await maybeEnqueueStitch(deps, scene.video_id);
+      }
     }
   };
 }
