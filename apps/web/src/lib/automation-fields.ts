@@ -25,6 +25,27 @@ const PROVIDER = [
   { value: "magichour", label: "Magic Hour" },
 ];
 
+// Modelos LLM (OpenAI) disponíveis para os agentes da automação.
+const OPENAI_MODELS = [
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "chatgpt-4o-latest",
+  "gpt-4-turbo",
+  "gpt-4",
+  "gpt-3.5-turbo",
+  "gpt-3.5-turbo-0125",
+  "gpt-3.5-turbo-1106",
+  "gpt-3.5-turbo-16k",
+  "o1",
+  "o1-mini",
+  "o3",
+  "o3-mini",
+  "o4-mini",
+].map((m) => ({ value: m, label: m }));
+
 export const NODE_FIELDS: Record<NodeType, FieldSpec[]> = {
   Schedule: [
     { key: "post_times", label: "Horários de publicação", type: "timeList", default: ["09:00", "18:00"] },
@@ -53,7 +74,7 @@ export const NODE_FIELDS: Record<NodeType, FieldSpec[]> = {
   DirectorAgent: [
     { key: "system_prompt", label: "Prompt do agente (roteiro)", type: "textarea", placeholder: "Você é um roteirista…", default: "" },
     { key: "num_scenes", label: "Número de cenas", type: "slider", min: 1, max: 12, default: 1 },
-    { key: "llm_model", label: "Modelo LLM", type: "text", default: "google/gemini-2.5-flash" },
+    { key: "llm_model", label: "Modelo LLM (OpenAI)", type: "select", options: OPENAI_MODELS, default: "gpt-4.1" },
   ],
   HookSelector: [
     { key: "strategy", label: "Estratégia", type: "radio", options: [
@@ -64,6 +85,7 @@ export const NODE_FIELDS: Record<NodeType, FieldSpec[]> = {
   ],
   CaptionAgent: [
     { key: "system_prompt", label: "Prompt da legenda", type: "textarea", default: "" },
+    { key: "llm_model", label: "Modelo LLM (OpenAI)", type: "select", options: OPENAI_MODELS, default: "gpt-4.1" },
     { key: "max_len", label: "Tamanho máx.", type: "number", min: 1, max: 2200, default: 2200 },
   ],
   SafetyFilter: [{ key: "banned_terms", label: "Termos banidos", type: "stringList", placeholder: "celebrity, real person" }],
