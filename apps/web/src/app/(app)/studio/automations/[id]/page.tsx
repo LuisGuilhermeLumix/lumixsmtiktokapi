@@ -189,15 +189,29 @@ export default function AutomationEditor() {
     void tick();
     async function tick() {
       try {
-        const r = await apiFetch<{ run: { status: string }; steps: Array<{ step: string }> }>(`/runs/${runId}`);
+        const r = await apiFetch<{ run: { status: string }; steps: Array<{ step: string; status: string }> }>(`/runs/${runId}`);
         if (!active) return;
         const info = phaseFromRun(r.run.status, r.steps ?? []);
-        const order = topoOrder(nodesRef.current, edgesRef.current);
-        // fase (0..N) → posição do frontier na ordem dos nós (um por vez)
-        const upto = info.finished
-          ? order.length
-          : Math.min(order.length - 1, Math.round((info.phase / PHASES.length) * order.length));
-        setNodeStatus(walkStatus(order, upto, info.finished, info.failed));
+        // motor real: os steps SÃO ids de nó → anima cada nó pelo status real
+        const nodeIds = new Set(nodesRef.current.map((n) => n.id));
+        const real: Record<string, RunStatus> = {};
+        let isReal = false;
+        for (const s of r.steps ?? []) {
+          if (nodeIds.has(s.step)) {
+            isReal = true;
+            real[s.step] = s.status === "done" ? "done" : s.status === "failed" ? "failed" : "running";
+          }
+        }
+        if (isReal) {
+          setNodeStatus(real);
+        } else {
+          // pipeline fixo: frontier mapeado da fase → posição na ordem dos nós
+          const order = topoOrder(nodesRef.current, edgesRef.current);
+          const upto = info.finished
+            ? order.length
+            : Math.min(order.length - 1, Math.round((info.phase / PHASES.length) * order.length));
+          setNodeStatus(walkStatus(order, upto, info.finished, info.failed));
+        }
         if (info.finished) {
           clearInterval(iv);
           loadRuns();
@@ -249,12 +263,13 @@ export default function AutomationEditor() {
     const r = await apiFetch<{ ok: boolean; errors?: string[] }>(`/workflows/${id}/validate`, { method: "POST", body: { graph: serialize() } });
     setMsg(r.ok ? { kind: "success", text: "Grafo válido — pronto para ativar." } : { kind: "error", text: `Inválido: ${r.errors?.join(" | ")}` });
   });
-  const startRun = () =>
+  const startRun = (engine?: "graph") =>
     action(async () => {
       setExecOpen(false);
       await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize() } });
-      const r = await apiFetch<{ run_id: string }>(`/workflows/${id}/test`, { method: "POST" });
-      setMsg({ kind: "info", text: "Execução iniciada — acompanhe os nós." });
+      const path = engine === "graph" ? `/workflows/${id}/test?engine=graph` : `/workflows/${id}/test`;
+      const r = await apiFetch<{ run_id: string }>(path, { method: "POST" });
+      setMsg({ kind: "info", text: engine === "graph" ? "Motor real: executando nó a nó." : "Execução iniciada — acompanhe os nós." });
       setShowRuns(true);
       setNodeStatus(walkStatus(topoOrder(nodes, edges), 0, false, false));
       setRunId(r.run_id);
@@ -412,13 +427,19 @@ export default function AutomationEditor() {
                 {triggers.map((t, i) => (
                   <button
                     key={i}
-                    onClick={startRun}
+                    onClick={() => startRun()}
                     className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-dim transition-colors hover:bg-surface-overlay hover:text-ink"
                   >
                     <Play className="size-3 text-lumix-purple" /> {t}
                   </button>
                 ))}
                 <div className="my-1 border-t border-border-subtle" />
+                <button
+                  onClick={() => startRun("graph")}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-dim transition-colors hover:bg-surface-overlay hover:text-ink"
+                >
+                  <Play className="size-3 text-emerald-400" /> Motor real (grafo) — nó a nó
+                </button>
                 <button
                   onClick={runDemo}
                   className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-faint transition-colors hover:bg-surface-overlay hover:text-ink"
@@ -429,7 +450,7 @@ export default function AutomationEditor() {
             )}
             <div className="flex items-stretch overflow-hidden rounded-xl shadow-2xl ring-1 ring-black/30">
               <button
-                onClick={startRun}
+                onClick={() => startRun()}
                 disabled={busy}
                 className="flex items-center gap-2 bg-gradient-to-r from-lumix-purple to-lumix-magenta px-5 py-2.5 text-left text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
               >

@@ -4,6 +4,7 @@ import { createServiceClient, type Db } from "@lsm/db";
 import {
   QUEUE_AUTO_PLAN,
   QUEUE_AUTO_SCAN,
+  QUEUE_GRAPH_EXEC,
   QUEUE_PUBLISH,
   QUEUE_SCENE_POLL,
   QUEUE_STATUS,
@@ -27,6 +28,7 @@ export interface ApiDeps {
     autoScan: Queue<AutoScanJobData>;
     autoPlan: Queue<AutoPlanJobData>;
     scenePoll: Queue<ScenePollJobData>;
+    graphExec: Queue<AutoPlanJobData>;
   };
 }
 
@@ -66,6 +68,7 @@ export function createDeps(config: ApiConfig): ApiDeps {
       autoScan: new Queue<AutoScanJobData>(QUEUE_AUTO_SCAN, { connection: redis, defaultJobOptions }),
       autoPlan: new Queue<AutoPlanJobData>(QUEUE_AUTO_PLAN, { connection: redis, defaultJobOptions }),
       scenePoll: new Queue<ScenePollJobData>(QUEUE_SCENE_POLL, { connection: redis, defaultJobOptions }),
+      graphExec: new Queue<AutoPlanJobData>(QUEUE_GRAPH_EXEC, { connection: redis, defaultJobOptions }),
     },
   };
 }
@@ -77,6 +80,7 @@ export async function closeDeps(deps: ApiDeps): Promise<void> {
     deps.queues.autoScan.close(),
     deps.queues.autoPlan.close(),
     deps.queues.scenePoll.close(),
+    deps.queues.graphExec.close(),
     deps.redis.quit(),
   ]);
 }

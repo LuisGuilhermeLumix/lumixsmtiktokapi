@@ -6,6 +6,7 @@ import {
   QUEUE_AUTO_PLAN,
   QUEUE_AUTO_SCAN,
   QUEUE_AUTOMATION,
+  QUEUE_GRAPH_EXEC,
   QUEUE_PUBLISH,
   QUEUE_SCENE_POLL,
   QUEUE_SCENE_VIDEO,
@@ -48,6 +49,7 @@ export interface WorkerDeps {
     sceneVideo: Queue<SceneVideoJobData>;
     scenePoll: Queue<ScenePollJobData>;
     videoStitch: Queue<VideoStitchJobData>;
+    graphExec: Queue<AutoPlanJobData>;
   };
 }
 
@@ -98,6 +100,7 @@ export function createDeps(config: WorkerConfig): WorkerDeps {
         connection: redis,
         defaultJobOptions,
       }),
+      graphExec: new Queue<AutoPlanJobData>(QUEUE_GRAPH_EXEC, { connection: redis, defaultJobOptions }),
     },
   };
 }
@@ -115,6 +118,7 @@ export async function closeDeps(deps: WorkerDeps): Promise<void> {
     deps.queues.sceneVideo.close(),
     deps.queues.scenePoll.close(),
     deps.queues.videoStitch.close(),
+    deps.queues.graphExec.close(),
     deps.redis.quit(),
   ]);
 }

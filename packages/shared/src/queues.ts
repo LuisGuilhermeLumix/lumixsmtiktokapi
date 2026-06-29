@@ -16,6 +16,7 @@ export const QUEUE_SCRIPT_GEN = "script-generate"; // agente diretor → beats +
 export const QUEUE_SCENE_VIDEO = "scene-video"; // gera 1 cena (imagem→vídeo) no provider
 export const QUEUE_SCENE_POLL = "scene-poll"; // fallback de polling do provider
 export const QUEUE_VIDEO_STITCH = "video-stitch"; // FFmpeg: concat/xfade/trim/música → publica
+export const QUEUE_GRAPH_EXEC = "graph-exec"; // executor de grafo real (engine.ts, nó a nó)
 
 /** publica um post_target no TikTok (init → upload → dispara status) */
 export interface PublishJobData {

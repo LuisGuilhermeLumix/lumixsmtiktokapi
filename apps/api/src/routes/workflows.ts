@@ -312,7 +312,12 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
         slot,
         status: "queued",
       });
-      await deps.queues.autoPlan.add("plan", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
+      const engine = (req.query as { engine?: string } | undefined)?.engine;
+      if (engine === "graph") {
+        await deps.queues.graphExec.add("exec", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
+      } else {
+        await deps.queues.autoPlan.add("plan", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
+      }
       const result = { run_id: runId };
       if (idemKey) await idemSet(deps, req.auth!.orgId, idemKey, result);
       return result;
