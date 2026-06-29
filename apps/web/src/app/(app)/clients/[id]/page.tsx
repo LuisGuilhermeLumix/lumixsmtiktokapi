@@ -20,6 +20,13 @@ export default function ClientDetailPage() {
   const [connecting, setConnecting] = useState(false);
   const [toDisconnect, setToDisconnect] = useState<SocialAccount | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copyId(id: string) {
+    await navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+  }
 
   const load = useCallback(() => {
     apiFetch<{ clients: Client[] }>("/clients")
@@ -74,6 +81,16 @@ export default function ClientDetailPage() {
           </Button>
         </div>
         {client?.notes && <p className="mt-1 text-sm text-ink-faint">{client.notes}</p>}
+        <p className="mt-1 flex items-center gap-2">
+          <code className="font-mono text-[11px] text-ink-dim">client_id: {id}</code>
+          <button
+            type="button"
+            onClick={() => copyId(id)}
+            className="text-[11px] text-lumix-blue hover:underline"
+          >
+            {copiedId === id ? "copiado!" : "copiar"}
+          </button>
+        </p>
       </div>
 
       {tiktokResult === "connected" && (
@@ -120,6 +137,18 @@ export default function ClientDetailPage() {
                   <p className="truncate font-medium">{a.display_name ?? "Conta TikTok"}</p>
                   <p className="text-xs text-ink-faint">
                     conectada em {formatDateTime(a.connected_at)}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-2">
+                    <code className="font-mono text-[11px] text-ink-dim">
+                      social_account_id: {a.id}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => copyId(a.id)}
+                      className="text-[11px] text-lumix-blue hover:underline"
+                    >
+                      {copiedId === a.id ? "copiado!" : "copiar"}
+                    </button>
                   </p>
                 </div>
                 <StatusBadge status={a.status} />
