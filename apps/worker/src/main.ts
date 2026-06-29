@@ -5,6 +5,7 @@
 //   token-refresh  → cron 1h: renova access tokens perto do expiry
 
 import { Worker } from "bullmq";
+import * as Sentry from "@sentry/node";
 import {
   QUEUE_ANALYTICS,
   QUEUE_AUTO_PLAN,
@@ -32,6 +33,14 @@ import { createScriptGenProcessor } from "./processors/script-generate.js";
 import { createStatusProcessor } from "./processors/status.js";
 import { createTokenRefreshProcessor } from "./processors/token-refresh.js";
 import { createVideoStitchProcessor } from "./processors/video-stitch.js";
+
+// rastreamento de erros — no-op se SENTRY_DSN não estiver definido
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV ?? "development",
+  tracesSampleRate: 0.1,
+  initialScope: { tags: { service: "worker" } },
+});
 
 async function main() {
   const config = loadConfig();
@@ -73,6 +82,20 @@ async function main() {
       console.error(
         `[${worker.name}] job ${job?.id} falhou (tentativa ${job?.attemptsMade}/${job?.opts.attempts}): ${err.message}`,
       );
+      // só reporta a falha DEFINITIVA (esgotou as tentativas) — evita ruído
+      const exhausted = (job?.attemptsMade ?? 0) >= (job?.opts.attempts ?? 1);
+      if (exhausted) {
+        Sentry.withScope((scope) => {
+          scope.setTag("queue", worker.name);
+          const data = (job?.data ?? {}) as { runId?: string; videoId?: string; sceneId?: string };
+          if (data.runId) scope.setTag("runId", data.runId);
+          if (data.videoId) scope.setTag("videoId", data.videoId);
+          if (data.sceneId) scope.setTag("sceneId", data.sceneId);
+          scope.setExtra("jobId", job?.id);
+          scope.setExtra("jobData", job?.data);
+          Sentry.captureException(err);
+        });
+      }
     });
     worker.on("error", (err) => {
       console.error(`[${worker.name}] erro do worker: ${err.message}`);

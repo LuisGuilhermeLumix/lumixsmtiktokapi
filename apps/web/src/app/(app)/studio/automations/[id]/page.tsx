@@ -19,10 +19,10 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Ban, Play } from "lucide-react";
+import { Ban, ChevronUp, Play } from "lucide-react";
 import { NODE_CATEGORY, NODE_TYPES, type NodeType } from "@lsm/shared/automation";
 import { apiFetch } from "@/lib/api";
-import { defaultConfig } from "@/lib/automation-fields";
+import { COMING_SOON_NODES, defaultConfig } from "@/lib/automation-fields";
 import { EditorProvider, LsmNode, type EditorData, type LsmNodeData } from "@/components/automation/automation-node";
 import { RunInspector } from "@/components/automation/run-inspector";
 import { Banner, Button } from "@/components/ui";
@@ -98,6 +98,7 @@ export default function AutomationEditor() {
   const [nodeStatus, setNodeStatus] = useState<Record<string, RunStatus>>({});
   const [runId, setRunId] = useState<string | null>(null);
   const [execOpen, setExecOpen] = useState(false);
+  const [estimate, setEstimate] = useState<{ estimate: { maxCredits: number; minCredits: number }; current_balance: number; sufficient: boolean } | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [showRuns, setShowRuns] = useState(false);
   const [inspectRunId, setInspectRunId] = useState<string | null>(null);
@@ -106,6 +107,12 @@ export default function AutomationEditor() {
 
   const loadRuns = useCallback(() => {
     apiFetch<{ runs: Run[] }>(`/workflows/${id}/runs`).then((r) => setRuns(r.runs)).catch(() => setRuns([]));
+  }, [id]);
+
+  const loadEstimate = useCallback(() => {
+    apiFetch<{ estimate: { maxCredits: number; minCredits: number }; current_balance: number; sufficient: boolean }>(`/workflows/${id}/cost-estimate`)
+      .then(setEstimate)
+      .catch(() => setEstimate(null));
   }, [id]);
 
   useEffect(() => {
@@ -275,32 +282,6 @@ export default function AutomationEditor() {
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => { setShowRuns((s) => !s); loadRuns(); }}>Runs</Button>
           <Button variant="secondary" onClick={validate} disabled={busy}>Validar</Button>
-          <div className="relative">
-            <Button variant="secondary" onClick={() => setExecOpen((o) => !o)} disabled={busy}>
-              <Play className="size-3.5" /> Executar
-            </Button>
-            {execOpen && (
-              <div className="absolute right-0 z-30 mt-1 w-64 rounded-lg border border-border-subtle bg-surface-raised p-1 shadow-2xl">
-                <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-ink-faint">Executar a partir de</p>
-                {triggers.map((t, i) => (
-                  <button
-                    key={i}
-                    onClick={startRun}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-dim transition-colors hover:bg-surface-overlay hover:text-ink"
-                  >
-                    <Play className="size-3 text-lumix-purple" /> {t}
-                  </button>
-                ))}
-                <div className="my-1 border-t border-border-subtle" />
-                <button
-                  onClick={runDemo}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-faint transition-colors hover:bg-surface-overlay hover:text-ink"
-                >
-                  <Play className="size-3 text-lumix-blue" /> Demo (simular animação)
-                </button>
-              </div>
-            )}
-          </div>
           <Button onClick={save} disabled={busy}>Salvar</Button>
           {wf.status === "active" ? (
             <Button variant="danger" onClick={() => setStatus("paused")} disabled={busy}>Pausar</Button>
@@ -320,11 +301,21 @@ export default function AutomationEditor() {
             <div key={cat}>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">{CAT_LABEL[cat] ?? cat}</p>
               <div className="space-y-1">
-                {types.map((t) => (
-                  <button key={t} onClick={() => addNode(t)} className="block w-full rounded-md border border-border-subtle px-2 py-1 text-left text-xs text-ink-dim hover:border-lumix-purple hover:text-ink">
-                    {t}
-                  </button>
-                ))}
+                {types.map((t) => {
+                  const soon = COMING_SOON_NODES.includes(t);
+                  return (
+                    <button
+                      key={t}
+                      disabled={soon}
+                      onClick={() => !soon && addNode(t)}
+                      title={soon ? "Em breve — não afeta a execução ainda" : ""}
+                      className={`flex w-full items-center justify-between gap-1 rounded-md border border-border-subtle px-2 py-1 text-left text-xs ${soon ? "cursor-not-allowed text-ink-faint opacity-60" : "text-ink-dim hover:border-lumix-purple hover:text-ink"}`}
+                    >
+                      {t}
+                      {soon && <span className="rounded bg-surface-overlay px-1 text-[8px] uppercase tracking-wide">Em breve</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -356,6 +347,58 @@ export default function AutomationEditor() {
               <p className="text-sm text-ink-faint">Clique nos nós da paleta para montar a automação →</p>
             </div>
           )}
+
+          {/* Executar — flutuante no rodapé do canvas (estilo n8n) */}
+          <div className="absolute bottom-5 left-1/2 z-20 -translate-x-1/2">
+            {execOpen && (
+              <div className="absolute bottom-full left-1/2 mb-2 w-64 -translate-x-1/2 rounded-lg border border-border-subtle bg-surface-raised p-1 shadow-2xl">
+                {estimate && (
+                  <div className={`mb-1 rounded-md px-2 py-1.5 text-[11px] ${estimate.sufficient ? "bg-surface-overlay text-ink-dim" : "bg-red-500/10 text-red-300"}`}>
+                    Custo estimado: <b className="text-ink">{estimate.estimate.maxCredits}</b> créditos · saldo {estimate.current_balance}
+                    {!estimate.sufficient && <span className="mt-0.5 block">⚠ Saldo insuficiente</span>}
+                  </div>
+                )}
+                <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-ink-faint">Executar a partir de</p>
+                {triggers.map((t, i) => (
+                  <button
+                    key={i}
+                    onClick={startRun}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-dim transition-colors hover:bg-surface-overlay hover:text-ink"
+                  >
+                    <Play className="size-3 text-lumix-purple" /> {t}
+                  </button>
+                ))}
+                <div className="my-1 border-t border-border-subtle" />
+                <button
+                  onClick={runDemo}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-faint transition-colors hover:bg-surface-overlay hover:text-ink"
+                >
+                  <Play className="size-3 text-lumix-blue" /> Demo (simular animação)
+                </button>
+              </div>
+            )}
+            <div className="flex items-stretch overflow-hidden rounded-xl shadow-2xl ring-1 ring-black/30">
+              <button
+                onClick={startRun}
+                disabled={busy}
+                className="flex items-center gap-2 bg-gradient-to-r from-lumix-purple to-lumix-magenta px-5 py-2.5 text-left text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+              >
+                <Play className="size-4 shrink-0" />
+                <span className="flex flex-col leading-tight">
+                  <span>Executar workflow</span>
+                  <span className="text-[10px] font-normal text-white/80">de {triggers[0] ?? "Manual"}</span>
+                </span>
+              </button>
+              <button
+                onClick={() => setExecOpen((o) => { const next = !o; if (next) loadEstimate(); return next; })}
+                disabled={busy}
+                aria-label="Opções de execução"
+                className="flex items-center bg-lumix-magenta px-2 text-white transition hover:brightness-110 disabled:opacity-60"
+              >
+                <ChevronUp className={`size-4 transition-transform ${execOpen ? "rotate-180" : ""}`} />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* drawer de runs */}

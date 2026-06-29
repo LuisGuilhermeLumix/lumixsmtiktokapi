@@ -9,12 +9,21 @@ import { GENERATION_KINDS, toBullJobId } from "@lsm/shared";
 import { creditsForModel, kieCreateTask, kieRecordInfo, KieError } from "@lsm/shared/kie";
 import { mhCreateVideo, mhGetVideo, MagicHourError } from "@lsm/shared/magichour";
 import type { Json, Tables } from "@lsm/db";
+import { timingSafeEqual } from "node:crypto";
 import type { ApiDeps } from "../deps.js";
 import { assertAccountAccess, assertClientAccess } from "../lib/access.js";
 import type { AuthHooks } from "../lib/auth.js";
 import { httpError } from "../lib/errors.js";
 
 type Provider = "kie" | "magichour";
+
+/** comparação resistente a timing attacks (mesmo tamanho → constante) */
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 /** lê o provider salvo no input jsonb da geração */
 function readProvider(input: Json | null): Provider {
@@ -410,7 +419,7 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
     async (req, reply) => {
       if (
         deps.config.KIE_CALLBACK_SECRET &&
-        req.query.secret !== deps.config.KIE_CALLBACK_SECRET
+        !safeEqual(req.query.secret ?? "", deps.config.KIE_CALLBACK_SECRET)
       ) {
         throw httpError(401, "secret inválido");
       }

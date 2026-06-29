@@ -2,6 +2,7 @@
 // Operações ATÔMICAS via RPC (charge_credits/refund_credits) — sem race de
 // read-modify-write. Idempotência pelos campos credits_reserved/credits_settled.
 
+import { calcRefund, calcSettled } from "@lsm/shared/automation";
 import type { WorkerDeps } from "../deps.js";
 
 /** reserva créditos do run (idempotente). Retorna false se saldo insuficiente. */
@@ -40,12 +41,12 @@ export async function settleRun(deps: WorkerDeps, runId: string): Promise<void> 
   if (videoIds.length) {
     const { data: scenes } = await deps.db
       .from("automation_scenes")
-      .select("credits_charged")
+      .select("status, credits_charged")
       .in("video_id", videoIds);
-    used = (scenes ?? []).reduce((s, sc) => s + (sc.credits_charged ?? 0), 0);
+    used = calcSettled(scenes ?? []);
   }
 
-  const refund = run.credits_reserved - used;
+  const refund = calcRefund(run.credits_reserved, used);
   if (refund > 0) {
     await deps.db.rpc("refund_credits", {
       p_org: run.org_id,

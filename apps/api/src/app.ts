@@ -3,6 +3,24 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
+import * as Sentry from "@sentry/node";
+
+// rastreamento de erros — no-op se SENTRY_DSN não estiver definido
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV ?? "development",
+  tracesSampleRate: 0.1,
+  initialScope: { tags: { service: "api" } },
+});
+
+function captureApiError(err: unknown, req: { url: string; method: string; auth?: { orgId?: string } | null }): void {
+  Sentry.withScope((scope) => {
+    scope.setTag("route", req.url);
+    scope.setTag("method", req.method);
+    if (req.auth?.orgId) scope.setTag("orgId", req.auth.orgId);
+    Sentry.captureException(err);
+  });
+}
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import {
@@ -100,6 +118,7 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
       // 5xx não vaza a mensagem interna (pode conter detalhe de DB)
       if (err.statusCode >= 500) {
         req.log.error({ err }, "erro 5xx");
+        captureApiError(err, req);
         return reply.code(err.statusCode).send({ error: "Erro interno" });
       }
       return reply.code(err.statusCode).send({ error: err.message });
@@ -124,7 +143,10 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
       typeof fastifyErr.statusCode === "number" && fastifyErr.statusCode >= 400
         ? fastifyErr.statusCode
         : 500;
-    if (status >= 500) req.log.error({ err }, "erro não tratado");
+    if (status >= 500) {
+      req.log.error({ err }, "erro não tratado");
+      captureApiError(err, req);
+    }
     return reply
       .code(status)
       .send({ error: status >= 500 ? "Erro interno" : fastifyErr.message });

@@ -57,8 +57,9 @@ export function createDeps(config: WorkerConfig): WorkerDeps {
   const defaultJobOptions = {
     attempts: 5,
     backoff: { type: "exponential" as const, delay: 30_000 },
-    removeOnComplete: { count: 1000 },
-    removeOnFail: { count: 5000 },
+    // cleanup: por contagem E por idade (o que vier primeiro) — evita crescer Redis
+    removeOnComplete: { count: 1000, age: 24 * 3600 },
+    removeOnFail: { count: 5000, age: 7 * 24 * 3600 },
   };
 
   return {
