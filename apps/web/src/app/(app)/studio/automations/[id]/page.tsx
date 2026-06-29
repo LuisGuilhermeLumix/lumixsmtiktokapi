@@ -3,7 +3,7 @@
 // Designer NO-CODE da automação (React Flow + nós customizados com controles
 // inline). Tela cheia, paleta por categoria, CRUD de nó, Validar/Testar/Salvar/Ativar.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -74,15 +74,49 @@ function phaseFromRun(
   return { phase, finished: false, failed: false };
 }
 
-function statusMap(info: { phase: number; finished: boolean; failed: boolean }): Record<string, RunStatus> {
-  const m: Record<string, RunStatus> = {};
-  PHASES.forEach((types, i) => {
-    for (const t of types) {
-      if (info.finished) m[t] = info.failed ? "failed" : "done";
-      else if (i < info.phase) m[t] = "done";
-      else if (i === info.phase) m[t] = "running";
-      else m[t] = "pending";
+// ordem topológica dos nós seguindo as arestas (começa nos gatilhos sem entrada)
+function topoOrder(
+  nodes: Array<{ id: string }>,
+  edges: Array<{ source: string; target: string }>,
+): string[] {
+  const adj = new Map<string, string[]>();
+  const indeg = new Map<string, number>();
+  for (const n of nodes) {
+    adj.set(n.id, []);
+    indeg.set(n.id, 0);
+  }
+  for (const e of edges) {
+    if (adj.has(e.source) && indeg.has(e.target)) {
+      adj.get(e.source)!.push(e.target);
+      indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1);
     }
+  }
+  const queue = nodes.filter((n) => (indeg.get(n.id) ?? 0) === 0).map((n) => n.id);
+  const order: string[] = [];
+  const seen = new Set<string>();
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    order.push(id);
+    for (const t of adj.get(id) ?? []) {
+      const d = (indeg.get(t) ?? 1) - 1;
+      indeg.set(t, d);
+      if (d <= 0) queue.push(t);
+    }
+  }
+  for (const n of nodes) if (!seen.has(n.id)) order.push(n.id); // desconexos no fim
+  return order;
+}
+
+// status por ID seguindo a ordem: anteriores=done, atual=running/failed, resto=pending
+function walkStatus(order: string[], upto: number, finished: boolean, failed: boolean): Record<string, RunStatus> {
+  const m: Record<string, RunStatus> = {};
+  order.forEach((id, i) => {
+    if (finished && !failed) m[id] = "done";
+    else if (i < upto) m[id] = "done";
+    else if (i === upto) m[id] = finished && failed ? "failed" : "running";
+    else m[id] = "pending";
   });
   return m;
 }
@@ -104,6 +138,12 @@ export default function AutomationEditor() {
   const [inspectRunId, setInspectRunId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // refs do grafo atual (p/ o polling montar a ordem topológica sem reiniciar)
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+  const edgesRef = useRef(edges);
+  edgesRef.current = edges;
 
   const loadRuns = useCallback(() => {
     apiFetch<{ runs: Run[] }>(`/workflows/${id}/runs`).then((r) => setRuns(r.runs)).catch(() => setRuns([]));
@@ -152,7 +192,12 @@ export default function AutomationEditor() {
         const r = await apiFetch<{ run: { status: string }; steps: Array<{ step: string }> }>(`/runs/${runId}`);
         if (!active) return;
         const info = phaseFromRun(r.run.status, r.steps ?? []);
-        setNodeStatus(statusMap(info));
+        const order = topoOrder(nodesRef.current, edgesRef.current);
+        // fase (0..N) → posição do frontier na ordem dos nós (um por vez)
+        const upto = info.finished
+          ? order.length
+          : Math.min(order.length - 1, Math.round((info.phase / PHASES.length) * order.length));
+        setNodeStatus(walkStatus(order, upto, info.finished, info.failed));
         if (info.finished) {
           clearInterval(iv);
           loadRuns();
@@ -211,7 +256,7 @@ export default function AutomationEditor() {
       const r = await apiFetch<{ run_id: string }>(`/workflows/${id}/test`, { method: "POST" });
       setMsg({ kind: "info", text: "Execução iniciada — acompanhe os nós." });
       setShowRuns(true);
-      setNodeStatus(statusMap({ phase: 0, finished: false, failed: false }));
+      setNodeStatus(walkStatus(topoOrder(nodes, edges), 0, false, false));
       setRunId(r.run_id);
     });
 
@@ -236,23 +281,28 @@ export default function AutomationEditor() {
     }
   }
 
-  // animação simulada (sem backend) — só para visualizar o fluxo nó-a-nó
+  // animação simulada (sem backend): caminha UM nó por vez seguindo as conexões
   function runDemo() {
     setExecOpen(false);
     setRunId(null);
+    const order = topoOrder(nodes, edges);
+    if (order.length === 0) {
+      setMsg({ kind: "error", text: "Monte o fluxo primeiro." });
+      return;
+    }
+    setMsg({ kind: "info", text: "Demo: rodando nó por nó (seguindo as conexões)." });
     let i = 0;
-    setNodeStatus(statusMap({ phase: 0, finished: false, failed: false }));
-    setMsg({ kind: "info", text: "Demo: simulando a execução nó-a-nó." });
+    setNodeStatus(walkStatus(order, 0, false, false));
     const iv = setInterval(() => {
       i += 1;
-      if (i >= PHASES.length) {
+      if (i >= order.length) {
         clearInterval(iv);
-        setNodeStatus(statusMap({ phase: PHASES.length, finished: true, failed: false }));
+        setNodeStatus(walkStatus(order, order.length, true, false));
         setTimeout(() => setNodeStatus({}), 3000);
       } else {
-        setNodeStatus(statusMap({ phase: i, finished: false, failed: false }));
+        setNodeStatus(walkStatus(order, i, false, false));
       }
-    }, 1100);
+    }, 750);
   }
   const setStatus = (status: "active" | "paused") => action(async () => {
     await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize(), status } });
