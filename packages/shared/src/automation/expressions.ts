@@ -29,15 +29,38 @@ function lookup(expr: string, ctx: ExprContext): unknown {
   return cur;
 }
 
-/** resolve todas as expressões {{ }} de um template no contexto dado */
+// transformações seguras encadeáveis: {{ $account.display_name | upper }}
+const PIPES: Record<string, (s: string) => string> = {
+  upper: (s) => s.toUpperCase(),
+  lower: (s) => s.toLowerCase(),
+  trim: (s) => s.trim(),
+  capitalize: (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s),
+  slug: (s) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, ""),
+};
+
+/** resolve todas as expressões {{ }} (com pipes opcionais) no contexto dado */
 export function resolveExpressions(template: string, ctx: ExprContext): string {
   if (!template || !template.includes("{{")) return template;
   return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_m, raw: string) => {
-    const val = lookup(raw.trim(), ctx);
-    if (val == null || typeof val === "object") return "";
-    return String(val);
+    const parts = String(raw).split("|").map((p) => p.trim());
+    const val = lookup(parts[0] ?? "", ctx);
+    let out = val == null || typeof val === "object" ? "" : String(val);
+    for (const pipe of parts.slice(1)) {
+      const fn = PIPES[pipe];
+      if (fn) out = fn(out);
+    }
+    return out;
   });
 }
+
+/** pipes disponíveis (para dicas na UI) */
+export const EXPRESSION_PIPES = ["upper", "lower", "trim", "capitalize", "slug"] as const;
 
 /** variáveis disponíveis (para dicas na UI) */
 export const EXPRESSION_VARS = [

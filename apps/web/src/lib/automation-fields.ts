@@ -184,6 +184,9 @@ export const NODE_ICON: Record<string, string> = {
   output: "📤",
 };
 
+/** nós que existem na autoria mas ainda NÃO afetam a execução (pipeline fixo) */
+export const COMING_SOON_NODES: NodeType[] = ["If", "Switch", "Merge"];
+
 export const CAT_COLOR: Record<string, string> = {
   trigger: "#3b82f6",
   flow: "#6b7280",

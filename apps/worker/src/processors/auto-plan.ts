@@ -9,6 +9,7 @@ import {
   type AutoPlanJobData,
   type ScriptGenJobData,
 } from "@lsm/shared";
+import { calcReservation } from "@lsm/shared/automation";
 import type { WorkerDeps } from "../deps.js";
 import { reserveRunCredits } from "../lib/auto-credits.js";
 import { getInflight, incrInflight } from "../lib/auto-limits.js";
@@ -64,7 +65,7 @@ export function createAutoPlanProcessor(deps: WorkerDeps) {
       config.credits_per_scene > 0
         ? config.credits_per_scene
         : creditsForModel(config.video_model, config.duration_per_scene, deps.config.CREDIT_MARKUP);
-    const total = toCreate * config.num_scenes * perScene;
+    const total = calcReservation(toCreate, config.num_scenes, perScene);
 
     const ok = await reserveRunCredits(deps, run, total);
     if (!ok) {

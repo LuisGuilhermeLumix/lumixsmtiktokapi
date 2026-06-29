@@ -22,7 +22,7 @@ import "@xyflow/react/dist/style.css";
 import { Ban, ChevronUp, Play } from "lucide-react";
 import { NODE_CATEGORY, NODE_TYPES, type NodeType } from "@lsm/shared/automation";
 import { apiFetch } from "@/lib/api";
-import { defaultConfig } from "@/lib/automation-fields";
+import { COMING_SOON_NODES, defaultConfig } from "@/lib/automation-fields";
 import { EditorProvider, LsmNode, type EditorData, type LsmNodeData } from "@/components/automation/automation-node";
 import { RunInspector } from "@/components/automation/run-inspector";
 import { Banner, Button } from "@/components/ui";
@@ -294,11 +294,21 @@ export default function AutomationEditor() {
             <div key={cat}>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">{CAT_LABEL[cat] ?? cat}</p>
               <div className="space-y-1">
-                {types.map((t) => (
-                  <button key={t} onClick={() => addNode(t)} className="block w-full rounded-md border border-border-subtle px-2 py-1 text-left text-xs text-ink-dim hover:border-lumix-purple hover:text-ink">
-                    {t}
-                  </button>
-                ))}
+                {types.map((t) => {
+                  const soon = COMING_SOON_NODES.includes(t);
+                  return (
+                    <button
+                      key={t}
+                      disabled={soon}
+                      onClick={() => !soon && addNode(t)}
+                      title={soon ? "Em breve — não afeta a execução ainda" : ""}
+                      className={`flex w-full items-center justify-between gap-1 rounded-md border border-border-subtle px-2 py-1 text-left text-xs ${soon ? "cursor-not-allowed text-ink-faint opacity-60" : "text-ink-dim hover:border-lumix-purple hover:text-ink"}`}
+                    >
+                      {t}
+                      {soon && <span className="rounded bg-surface-overlay px-1 text-[8px] uppercase tracking-wide">Em breve</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
