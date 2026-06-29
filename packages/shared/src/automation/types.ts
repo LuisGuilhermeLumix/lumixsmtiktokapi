@@ -135,6 +135,8 @@ export interface AutomationRunConfig {
   video_model: string;
   director_prompt: string;
   caption_prompt: string;
+  /** modelo LLM (OpenAI) usado pelos agentes diretor/legenda */
+  llm_model: string;
   stitch_mode: "montage" | "monologue";
   best_effort_stitch: boolean;
   privacy_level: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";

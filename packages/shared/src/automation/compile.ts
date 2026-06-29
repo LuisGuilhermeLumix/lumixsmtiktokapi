@@ -87,6 +87,10 @@ export function compileWorkflow(workflowId: string, graph: AutomationGraph): Com
     video_model: (videoGen as { model?: string }).model ?? "veo3_fast",
     director_prompt: (director as { system_prompt?: string }).system_prompt ?? "",
     caption_prompt: (caption as { system_prompt?: string }).system_prompt ?? "",
+    llm_model:
+      (director as { llm_model?: string }).llm_model ??
+      (caption as { llm_model?: string }).llm_model ??
+      "gpt-4.1",
     stitch_mode: (stitch as { mode?: "montage" | "monologue" }).mode ?? "montage",
     best_effort_stitch: (stitch as { best_effort?: boolean }).best_effort ?? true,
     privacy_level: (publish as { privacy_level?: string }).privacy_level ?? "PUBLIC_TO_EVERYONE",

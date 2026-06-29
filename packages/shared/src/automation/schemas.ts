@@ -116,6 +116,7 @@ export const runConfigSchema = z.object({
   video_model: z.string().default("veo3_fast"),
   director_prompt: z.string().default(""),
   caption_prompt: z.string().default(""),
+  llm_model: z.string().default("gpt-4.1"),
   stitch_mode: z.enum(["montage", "monologue"]).default("montage"),
   best_effort_stitch: z.boolean().default(true),
   privacy_level: z

@@ -19,6 +19,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { Play } from "lucide-react";
 import { NODE_CATEGORY, NODE_TYPES, type NodeType } from "@lsm/shared/automation";
 import { apiFetch } from "@/lib/api";
 import { defaultConfig } from "@/lib/automation-fields";
@@ -46,6 +47,45 @@ const CAT_LABEL: Record<string, string> = {
   output: "Saída",
 };
 
+type RunStatus = "pending" | "running" | "done" | "failed";
+
+// fases de execução do motor mapeadas a TIPOS de nó (animação nó-a-nó)
+const PHASES: NodeType[][] = [
+  ["Schedule", "GetNichePack", "GetCharacter", "GetAccounts", "LoopAccounts"],
+  ["DirectorAgent", "HookSelector", "CaptionAgent", "SafetyFilter"],
+  ["SceneImage", "VideoGen"],
+  ["Stitch", "AddMusic", "AddCaptions", "Trim"],
+  ["PublishTikTok", "SaveLibrary", "Notify"],
+];
+
+function phaseFromRun(
+  status: string,
+  steps: Array<{ step: string }>,
+): { phase: number; finished: boolean; failed: boolean } {
+  if (status === "done" || status === "partial") return { phase: PHASES.length, finished: true, failed: false };
+  if (status === "failed" || status === "skipped") return { phase: PHASES.length, finished: true, failed: true };
+  if (status === "queued" || status === "planning") return { phase: 0, finished: false, failed: false };
+  // running: infere pela etapa mais avançada já vista
+  const kinds = new Set(steps.map((s) => s.step.split(":")[0]));
+  let phase = 1; // running ⇒ plan concluído
+  if (kinds.has("scene")) phase = 2;
+  if (kinds.has("stitch")) phase = 3;
+  return { phase, finished: false, failed: false };
+}
+
+function statusMap(info: { phase: number; finished: boolean; failed: boolean }): Record<string, RunStatus> {
+  const m: Record<string, RunStatus> = {};
+  PHASES.forEach((types, i) => {
+    for (const t of types) {
+      if (info.finished) m[t] = info.failed ? "failed" : "done";
+      else if (i < info.phase) m[t] = "done";
+      else if (i === info.phase) m[t] = "running";
+      else m[t] = "pending";
+    }
+  });
+  return m;
+}
+
 export default function AutomationEditor() {
   const { id } = useParams<{ id: string }>();
   const nodeTypes = useMemo(() => ({ lsm: LsmNode }), []);
@@ -53,7 +93,10 @@ export default function AutomationEditor() {
   const [wf, setWf] = useState<Workflow | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [editorData, setEditorData] = useState<EditorData>({ packs: [], characters: [] });
+  const [editorData, setEditorData] = useState<{ packs: EditorData["packs"]; characters: EditorData["characters"] }>({ packs: [], characters: [] });
+  const [nodeStatus, setNodeStatus] = useState<Record<string, RunStatus>>({});
+  const [runId, setRunId] = useState<string | null>(null);
+  const [execOpen, setExecOpen] = useState(false);
   const [runs, setRuns] = useState<Run[]>([]);
   const [showRuns, setShowRuns] = useState(false);
   const [msg, setMsg] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null);
@@ -85,6 +128,36 @@ export default function AutomationEditor() {
     ]).then(([p, c]) => setEditorData({ packs: p.niche_packs, characters: c.characters }));
     loadRuns();
   }, [id, setNodes, setEdges, loadRuns]);
+
+  // polling do run ativo → anima os nós por fase (estilo n8n)
+  useEffect(() => {
+    if (!runId) {
+      setNodeStatus({});
+      return;
+    }
+    let active = true;
+    const iv = setInterval(tick, 2000);
+    void tick();
+    async function tick() {
+      try {
+        const r = await apiFetch<{ run: { status: string }; steps: Array<{ step: string }> }>(`/runs/${runId}`);
+        if (!active) return;
+        const info = phaseFromRun(r.run.status, r.steps ?? []);
+        setNodeStatus(statusMap(info));
+        if (info.finished) {
+          clearInterval(iv);
+          loadRuns();
+          setTimeout(() => active && setRunId(null), 4500); // mantém o highlight final
+        }
+      } catch {
+        /* mantém o último estado */
+      }
+    }
+    return () => {
+      active = false;
+      clearInterval(iv);
+    };
+  }, [runId, loadRuns]);
 
   const onConnect = useCallback((c: Connection) => setEdges((eds) => addEdge({ ...c, id: crypto.randomUUID(), animated: true }, eds)), [setEdges]);
 
@@ -122,13 +195,45 @@ export default function AutomationEditor() {
     const r = await apiFetch<{ ok: boolean; errors?: string[] }>(`/workflows/${id}/validate`, { method: "POST", body: { graph: serialize() } });
     setMsg(r.ok ? { kind: "success", text: "Grafo válido — pronto para ativar." } : { kind: "error", text: `Inválido: ${r.errors?.join(" | ")}` });
   });
-  const test = () => action(async () => {
-    await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize() } });
-    const r = await apiFetch<{ run_id: string }>(`/workflows/${id}/test`, { method: "POST" });
-    setMsg({ kind: "info", text: `Run de teste disparado.` });
-    setShowRuns(true);
-    setTimeout(loadRuns, 1500);
-  });
+  const startRun = () =>
+    action(async () => {
+      setExecOpen(false);
+      await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize() } });
+      const r = await apiFetch<{ run_id: string }>(`/workflows/${id}/test`, { method: "POST" });
+      setMsg({ kind: "info", text: "Execução iniciada — acompanhe os nós." });
+      setShowRuns(true);
+      setNodeStatus(statusMap({ phase: 0, finished: false, failed: false }));
+      setRunId(r.run_id);
+    });
+
+  const triggers = useMemo(() => {
+    const sched = nodes
+      .filter((n) => n.data.nodeType === "Schedule")
+      .map((n) => {
+        const times = (n.data.config?.post_times as string[] | undefined) ?? [];
+        return `Agendamento${times.length ? ` (${times.join(", ")})` : ""}`;
+      });
+    return [...sched, "Manual (agora)"];
+  }, [nodes]);
+
+  // animação simulada (sem backend) — só para visualizar o fluxo nó-a-nó
+  function runDemo() {
+    setExecOpen(false);
+    setRunId(null);
+    let i = 0;
+    setNodeStatus(statusMap({ phase: 0, finished: false, failed: false }));
+    setMsg({ kind: "info", text: "Demo: simulando a execução nó-a-nó." });
+    const iv = setInterval(() => {
+      i += 1;
+      if (i >= PHASES.length) {
+        clearInterval(iv);
+        setNodeStatus(statusMap({ phase: PHASES.length, finished: true, failed: false }));
+        setTimeout(() => setNodeStatus({}), 3000);
+      } else {
+        setNodeStatus(statusMap({ phase: i, finished: false, failed: false }));
+      }
+    }, 1100);
+  }
   const setStatus = (status: "active" | "paused") => action(async () => {
     await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize(), status } });
     setWf((w) => (w ? { ...w, status } : w));
@@ -157,7 +262,32 @@ export default function AutomationEditor() {
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => { setShowRuns((s) => !s); loadRuns(); }}>Runs</Button>
           <Button variant="secondary" onClick={validate} disabled={busy}>Validar</Button>
-          <Button variant="secondary" onClick={test} disabled={busy}>Testar</Button>
+          <div className="relative">
+            <Button variant="secondary" onClick={() => setExecOpen((o) => !o)} disabled={busy}>
+              <Play className="size-3.5" /> Executar
+            </Button>
+            {execOpen && (
+              <div className="absolute right-0 z-30 mt-1 w-64 rounded-lg border border-border-subtle bg-surface-raised p-1 shadow-2xl">
+                <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-ink-faint">Executar a partir de</p>
+                {triggers.map((t, i) => (
+                  <button
+                    key={i}
+                    onClick={startRun}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-dim transition-colors hover:bg-surface-overlay hover:text-ink"
+                  >
+                    <Play className="size-3 text-lumix-purple" /> {t}
+                  </button>
+                ))}
+                <div className="my-1 border-t border-border-subtle" />
+                <button
+                  onClick={runDemo}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-faint transition-colors hover:bg-surface-overlay hover:text-ink"
+                >
+                  <Play className="size-3 text-lumix-blue" /> Demo (simular animação)
+                </button>
+              </div>
+            )}
+          </div>
           <Button onClick={save} disabled={busy}>Salvar</Button>
           {wf.status === "active" ? (
             <Button variant="danger" onClick={() => setStatus("paused")} disabled={busy}>Pausar</Button>
@@ -189,7 +319,7 @@ export default function AutomationEditor() {
 
         {/* canvas */}
         <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-border-subtle">
-          <EditorProvider value={editorData}>
+          <EditorProvider value={{ ...editorData, nodeStatus }}>
             <ReactFlow
               nodes={nodes}
               edges={edges}

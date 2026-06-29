@@ -251,8 +251,11 @@ export default function AnalyticsPage() {
 
           <GlassCard className="p-5" delay={0.2}>
             <h2 className="mb-4 font-semibold">Views por vídeo (top da conta)</h2>
-            {videoBars.length === 0 ? (
-              <EmptyState title="Sem métricas de vídeo ainda" hint="Após publicar, as métricas chegam na próxima coleta (6/6h)." />
+            {videoBars.length === 0 || videoBars.every((v) => v.views === 0) ? (
+              <EmptyState
+                title="Sem métricas de vídeo ainda"
+                hint="As views aparecem para posts públicos (Direct Post) após a coleta automática (6/6h). Posts entregues como rascunho ou privados (SELF_ONLY) não retornam métricas de vídeo do TikTok."
+              />
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={videoBars}>

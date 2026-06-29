@@ -48,6 +48,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     const ctx = await loadRunContext(deps, video.run_id);
     if (!ctx) return;
     const { run, config, pack } = ctx;
+    const llm = config.llm_model || deps.config.KIE_LLM_MODEL; // modelo escolhido no nó
 
     if (!key) {
       await deps.db.from("automation_videos").update({ status: "failed", error: "sem KIE_API_KEY" }).eq("id", video.id);
@@ -66,7 +67,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     try {
       script = await kieLLM(
         key,
-        deps.config.KIE_LLM_MODEL,
+        llm,
         `${config.director_prompt}\n\nNicho: ${niche}\n${charNote}\n` +
           (hook ? `Comece com o gancho: "${hook.text}".\n` : "") +
           `Escreva um roteiro de vídeo curto para TikTok dividido em ${config.num_scenes} cena(s), ` +
@@ -83,7 +84,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     try {
       caption = await kieLLM(
         key,
-        deps.config.KIE_LLM_MODEL,
+        llm,
         `${config.caption_prompt}\n\nNicho: ${niche}\nGere a legenda final para TikTok (curta, 2-3 hashtags).`,
       );
     } catch {
