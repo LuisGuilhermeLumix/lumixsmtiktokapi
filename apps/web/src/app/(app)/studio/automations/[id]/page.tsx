@@ -215,6 +215,25 @@ export default function AutomationEditor() {
       });
     return [...sched, "Manual (agora)"];
   }, [nodes]);
+
+  // animação simulada (sem backend) — só para visualizar o fluxo nó-a-nó
+  function runDemo() {
+    setExecOpen(false);
+    setRunId(null);
+    let i = 0;
+    setNodeStatus(statusMap({ phase: 0, finished: false, failed: false }));
+    setMsg({ kind: "info", text: "Demo: simulando a execução nó-a-nó." });
+    const iv = setInterval(() => {
+      i += 1;
+      if (i >= PHASES.length) {
+        clearInterval(iv);
+        setNodeStatus(statusMap({ phase: PHASES.length, finished: true, failed: false }));
+        setTimeout(() => setNodeStatus({}), 3000);
+      } else {
+        setNodeStatus(statusMap({ phase: i, finished: false, failed: false }));
+      }
+    }, 1100);
+  }
   const setStatus = (status: "active" | "paused") => action(async () => {
     await apiFetch(`/workflows/${id}`, { method: "PATCH", body: { graph: serialize(), status } });
     setWf((w) => (w ? { ...w, status } : w));
@@ -259,6 +278,13 @@ export default function AutomationEditor() {
                     <Play className="size-3 text-lumix-purple" /> {t}
                   </button>
                 ))}
+                <div className="my-1 border-t border-border-subtle" />
+                <button
+                  onClick={runDemo}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink-faint transition-colors hover:bg-surface-overlay hover:text-ink"
+                >
+                  <Play className="size-3 text-lumix-blue" /> Demo (simular animação)
+                </button>
               </div>
             )}
           </div>

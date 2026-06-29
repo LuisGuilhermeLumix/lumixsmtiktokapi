@@ -3,9 +3,9 @@
 // Nó no-code do designer: renderiza os controles inline (cor, rádio, slider,
 // selects, listas) a partir de NODE_FIELDS e oferece CRUD do nó (duplicar/excluir).
 
-import { createContext, memo, useContext } from "react";
+import { createContext, memo, useContext, useState } from "react";
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
-import { Check, Clapperboard, Clock, Copy, Database, GitBranch, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, Clapperboard, Clock, Copy, Database, GitBranch, Loader2, Search, Send, Sparkles, X } from "lucide-react";
 import type { NodeType } from "@lsm/shared/automation";
 import { NODE_CATEGORY } from "@lsm/shared/automation";
 import { CAT_COLOR, NODE_FIELDS, defaultConfig, type FieldSpec } from "@/lib/automation-fields";
@@ -34,6 +34,65 @@ type Cfg = Record<string, unknown>;
 export interface LsmNodeData extends Record<string, unknown> {
   nodeType: NodeType;
   config: Cfg;
+}
+
+/** combobox com busca (estilo n8n "From list") para listas longas */
+function SearchSelect({
+  value,
+  options,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const current = options.find((o) => o.value === value);
+  const filtered = q ? options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase())) : options;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="nodrag flex w-full items-center justify-between rounded-md border border-border-subtle bg-surface px-2 py-1 text-xs text-ink"
+      >
+        <span className="truncate">{current?.label ?? value ?? placeholder ?? "Selecione…"}</span>
+        <ChevronDown className="size-3 shrink-0 text-ink-faint" />
+      </button>
+      {open && (
+        <div className="nodrag nowheel absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded-md border border-border-subtle bg-surface-raised p-1 shadow-2xl">
+          <div className="sticky top-0 mb-1 flex items-center gap-1 rounded bg-surface px-1.5">
+            <Search className="size-3 text-ink-faint" />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar…"
+              className="w-full bg-transparent py-1 text-xs text-ink placeholder:text-ink-faint focus:outline-none"
+            />
+          </div>
+          {filtered.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => {
+                onChange(o.value);
+                setOpen(false);
+                setQ("");
+              }}
+              className={`block w-full truncate rounded px-2 py-1 text-left text-xs ${o.value === value ? "bg-lumix-purple/25 text-ink" : "text-ink-dim hover:bg-surface-overlay"}`}
+            >
+              {o.label}
+            </button>
+          ))}
+          {filtered.length === 0 && <p className="px-2 py-1 text-xs text-ink-faint">Nada encontrado</p>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Field({
@@ -77,6 +136,10 @@ function Field({
         </button>
       );
     case "select":
+      // listas longas → combobox com busca (n8n style); curtas → select nativo
+      if (spec.options.length >= 6) {
+        return <SearchSelect value={String(value ?? spec.default ?? "")} options={spec.options} onChange={onChange} />;
+      }
       return (
         <select className={base} value={String(value ?? spec.default ?? "")} onChange={(e) => onChange(e.target.value)}>
           {spec.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -94,13 +157,8 @@ function Field({
       );
     case "packSelect":
     case "characterSelect": {
-      const opts = spec.type === "packSelect" ? packs : characters;
-      return (
-        <select className={base} value={String(value ?? spec.default ?? "")} onChange={(e) => onChange(e.target.value)}>
-          <option value="">Selecione…</option>
-          {opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
-      );
+      const opts = (spec.type === "packSelect" ? packs : characters).map((o) => ({ value: o.id, label: o.name }));
+      return <SearchSelect value={String(value ?? spec.default ?? "")} options={opts} onChange={onChange} placeholder="Selecione…" />;
     }
     case "timeList": {
       const list = Array.isArray(value) ? (value as string[]) : (spec.default ?? []);
