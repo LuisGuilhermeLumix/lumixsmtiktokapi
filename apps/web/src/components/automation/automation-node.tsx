@@ -3,11 +3,11 @@
 // Nó no-code do designer: renderiza os controles inline (cor, rádio, slider,
 // selects, listas) a partir de NODE_FIELDS e oferece CRUD do nó (duplicar/excluir).
 
-import { createContext, memo, useContext, useState } from "react";
+import { createContext, memo, useContext, useRef, useState } from "react";
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import { Check, ChevronDown, Clapperboard, Clock, Copy, Database, GitBranch, Loader2, Search, Send, Sparkles, X } from "lucide-react";
 import type { NodeType } from "@lsm/shared/automation";
-import { NODE_CATEGORY } from "@lsm/shared/automation";
+import { EXPRESSION_VARS, NODE_CATEGORY, resolveExpressions } from "@lsm/shared/automation";
 import { CAT_COLOR, NODE_FIELDS, defaultConfig, type FieldSpec } from "@/lib/automation-fields";
 
 export type RunStatus = "pending" | "running" | "done" | "failed";
@@ -95,6 +95,121 @@ function SearchSelect({
   );
 }
 
+// dados de exemplo p/ pré-visualizar expressões no editor (design-time)
+function sampleCtx() {
+  return {
+    now: new Date().toISOString(),
+    niche: "fazenda-ugc",
+    account: { display_name: "@minhafazenda", name: "@minhafazenda" },
+    character: { name: "Bia", description: "fazendeira simpática e carismática" },
+    video: { idx: 0 },
+  };
+}
+const VAR_SAMPLE: Record<string, string> = {
+  "$now": "data/hora atual",
+  "$today": "data de hoje",
+  "$niche": "nicho do workflow",
+  "$account.display_name": "nome da conta TikTok",
+  "$character.name": "nome do personagem",
+  "$character.description": "descrição do personagem",
+  "$video.idx": "índice do vídeo",
+};
+
+/** Editor de expressão (estilo n8n): variáveis + expressão + resultado ao vivo */
+function ExpressionEditor({ initial, onSave, onClose }: { initial: string; onSave: (v: string) => void; onClose: () => void }) {
+  const [val, setVal] = useState(initial);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const preview = resolveExpressions(val, sampleCtx());
+
+  function insert(token: string) {
+    const el = ref.current;
+    if (!el) {
+      setVal((v) => v + token);
+      return;
+    }
+    const s = el.selectionStart ?? val.length;
+    const e = el.selectionEnd ?? val.length;
+    const next = val.slice(0, s) + token + val.slice(e);
+    setVal(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.selectionStart = el.selectionEnd = s + token.length;
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="flex h-[70vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border-subtle bg-surface-raised shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-2.5">
+          <h3 className="text-sm font-semibold text-ink">Editor de expressão</h3>
+          <button onClick={onClose} aria-label="Fechar" className="rounded p-1 text-ink-faint hover:bg-surface-overlay hover:text-ink"><X className="size-4" /></button>
+        </div>
+        {/* variáveis */}
+        <div className="border-b border-border-subtle px-4 py-2">
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-ink-faint">Variáveis (clique p/ inserir)</p>
+          <div className="flex flex-wrap gap-1">
+            {EXPRESSION_VARS.map((v) => (
+              <button key={v} type="button" onClick={() => insert(`{{ ${v} }}`)} title={VAR_SAMPLE[v] ?? v} className="rounded-full border border-border-subtle bg-surface px-2 py-0.5 font-mono text-[10px] text-lumix-purple hover:bg-lumix-purple/15">
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* expressão | resultado */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-border-subtle md:grid-cols-2">
+          <div className="flex flex-col bg-surface p-3">
+            <p className="mb-1 text-[10px] text-ink-faint">Expressão — tudo dentro de <span className="font-mono text-lumix-purple">{"{{ }}"}</span> é resolvido</p>
+            <textarea ref={ref} value={val} onChange={(e) => setVal(e.target.value)} className="nowheel flex-1 resize-none rounded-md border border-border-subtle bg-surface-raised p-2 font-mono text-xs text-ink focus:border-lumix-purple focus:outline-none" />
+          </div>
+          <div className="flex flex-col bg-surface p-3">
+            <p className="mb-1 text-[10px] text-ink-faint">Resultado (dados de exemplo)</p>
+            <pre className="nowheel flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-border-subtle bg-surface-raised p-2 text-xs text-ink-dim">{preview}</pre>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-border-subtle px-4 py-2.5">
+          <button onClick={onClose} className="rounded-md px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancelar</button>
+          <button onClick={() => onSave(val)} className="rounded-md bg-lumix-purple px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110">Salvar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Campo de texto com toggle Fixo·Expressão + botão ƒx (abre o editor) */
+function ExprField({ value, placeholder, multiline, onChange }: { value: string; placeholder?: string; multiline?: boolean; onChange: (v: string) => void }) {
+  const [mode, setMode] = useState<"fixed" | "expr">(value.includes("{{") ? "expr" : "fixed");
+  const [editing, setEditing] = useState(false);
+  const base = "nodrag w-full rounded-md border border-border-subtle bg-surface px-2 py-1 text-xs text-ink focus:border-lumix-purple focus:outline-none";
+  const mono = mode === "expr" ? "font-mono" : "";
+  return (
+    <div className="relative">
+      <div className="mb-1 flex items-center justify-end gap-1">
+        <div className="flex overflow-hidden rounded border border-border-subtle text-[9px]">
+          <button type="button" onClick={() => setMode("fixed")} className={`px-1.5 py-0.5 ${mode === "fixed" ? "bg-surface-overlay text-ink" : "text-ink-faint"}`}>Fixo</button>
+          <button type="button" onClick={() => setMode("expr")} className={`px-1.5 py-0.5 ${mode === "expr" ? "bg-lumix-purple/30 text-ink" : "text-ink-faint"}`}>Expressão</button>
+        </div>
+        <button type="button" onClick={() => setEditing(true)} title="Editor de expressão" className="rounded border border-border-subtle px-1.5 py-0.5 text-[10px] font-semibold italic text-lumix-purple hover:bg-surface-overlay">ƒx</button>
+      </div>
+      {multiline ? (
+        <textarea className={`${base} nowheel ${mono}`} rows={3} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      ) : (
+        <input className={`${base} ${mono}`} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      )}
+      {editing && (
+        <ExpressionEditor
+          initial={value}
+          onClose={() => setEditing(false)}
+          onSave={(v) => {
+            onChange(v);
+            setMode(v.includes("{{") ? "expr" : "fixed");
+            setEditing(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 function Field({
   spec,
   value,
@@ -110,9 +225,9 @@ function Field({
 
   switch (spec.type) {
     case "text":
-      return <input className={base} value={String(value ?? "")} placeholder={spec.placeholder} onChange={(e) => onChange(e.target.value)} />;
+      return <ExprField value={String(value ?? "")} placeholder={spec.placeholder} onChange={onChange} />;
     case "textarea":
-      return <textarea className={`${base} nowheel`} rows={3} value={String(value ?? "")} placeholder={spec.placeholder} onChange={(e) => onChange(e.target.value)} />;
+      return <ExprField value={String(value ?? "")} placeholder={spec.placeholder} multiline onChange={onChange} />;
     case "color":
       return (
         <div className="flex items-center gap-2">
