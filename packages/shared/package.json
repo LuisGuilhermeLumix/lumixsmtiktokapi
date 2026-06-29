@@ -18,6 +18,10 @@
       "types": "./dist/kie.d.ts",
       "import": "./dist/kie.js"
     },
+    "./openai": {
+      "types": "./dist/openai.d.ts",
+      "import": "./dist/openai.js"
+    },
     "./magichour": {
       "types": "./dist/magichour.d.ts",
       "import": "./dist/magichour.js"
