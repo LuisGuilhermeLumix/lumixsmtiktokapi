@@ -24,6 +24,7 @@ import { NODE_CATEGORY, NODE_TYPES, type NodeType } from "@lsm/shared/automation
 import { apiFetch } from "@/lib/api";
 import { defaultConfig } from "@/lib/automation-fields";
 import { EditorProvider, LsmNode, type EditorData, type LsmNodeData } from "@/components/automation/automation-node";
+import { RunInspector } from "@/components/automation/run-inspector";
 import { Banner, Button } from "@/components/ui";
 
 type FlowNode = Node<LsmNodeData, "lsm">;
@@ -99,6 +100,7 @@ export default function AutomationEditor() {
   const [execOpen, setExecOpen] = useState(false);
   const [runs, setRuns] = useState<Run[]>([]);
   const [showRuns, setShowRuns] = useState(false);
+  const [inspectRunId, setInspectRunId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -379,7 +381,7 @@ export default function AutomationEditor() {
                   const running = !["done", "failed", "partial", "skipped"].includes(r.status);
                   return (
                     <li key={r.id} className="flex items-center justify-between gap-2 rounded border border-border-subtle px-2 py-1">
-                      <span className="truncate text-ink-dim">{r.slot}</span>
+                      <button onClick={() => setInspectRunId(r.id)} title="Ver dados gerados" className="truncate text-left text-ink-dim hover:text-ink hover:underline">{r.slot}</button>
                       <span className="flex items-center gap-1.5">
                         <span className={r.status === "done" ? "text-emerald-300" : r.status === "failed" ? "text-red-400" : "text-ink-faint"}>{r.status}</span>
                         {running && (
@@ -396,6 +398,10 @@ export default function AutomationEditor() {
           </div>
         )}
       </div>
+
+      {inspectRunId && (
+        <RunInspector runId={inspectRunId} onClose={() => setInspectRunId(null)} onChanged={loadRuns} />
+      )}
     </div>
   );
 }

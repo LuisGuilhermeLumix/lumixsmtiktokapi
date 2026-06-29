@@ -142,6 +142,12 @@ export interface AutomationRunConfig {
   privacy_level: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
   /** créditos por cena (custo bruto kie × markup, calculado no servidor) */
   credits_per_scene: number;
+  /** em caso de erro: parar o vídeo ou seguir (best-effort) */
+  on_error: "stop" | "continue";
+  /** tentativas por chamada de provider (retry com backoff) */
+  max_tries: number;
+  /** espera base entre tentativas (s) — backoff exponencial */
+  retry_wait_s: number;
 }
 
 // ───────────────────────── status de runtime ─────────────────────────

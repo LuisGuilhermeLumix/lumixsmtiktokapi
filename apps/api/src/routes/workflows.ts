@@ -380,13 +380,62 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
       const { data: videos } = await deps.db
         .from("automation_videos")
         .select("*")
-        .eq("run_id", run.id);
+        .eq("run_id", run.id)
+        .order("idx", { ascending: true });
+      const videoIds = (videos ?? []).map((v) => v.id);
+      let scenes: unknown[] = [];
+      if (videoIds.length) {
+        const { data: sc } = await deps.db
+          .from("automation_scenes")
+          .select("*")
+          .in("video_id", videoIds)
+          .order("idx", { ascending: true });
+        scenes = sc ?? [];
+      }
       const { data: steps } = await deps.db
         .from("automation_run_steps")
         .select("*")
         .eq("run_id", run.id)
         .order("created_at", { ascending: true });
-      return { run, videos: videos ?? [], steps: steps ?? [] };
+      return { run, videos: videos ?? [], scenes, steps: steps ?? [] };
+    },
+  );
+
+  // re-executa um run (cria um novo run a partir do mesmo workflow) — "retry"
+  r.post(
+    "/runs/:id/retry",
+    {
+      preHandler: [auth.authenticate],
+      schema: { tags: ["automation"], description: "Re-executa (retry) um run", params: z.object({ id: z.string().min(1) }) },
+    },
+    async (req) => {
+      const { data: run } = await deps.db
+        .from("automation_runs")
+        .select("id, workflow_id")
+        .eq("id", req.params.id)
+        .eq("org_id", req.auth!.orgId)
+        .maybeSingle();
+      if (!run) throw httpError(404, "Run não encontrado");
+      const wf = await load(req.auth!.orgId, run.workflow_id);
+      if (!wf) throw httpError(404, "Workflow não encontrado");
+      const c = compileWorkflow(wf.id, wf.graph as unknown as AutomationGraph);
+      if (!c.ok) throw httpError(400, `Grafo inválido: ${c.errors.join(" | ")}`);
+      await deps.db.from("automation_workflows").update({ compiled_plan: c.plan as unknown as Json }).eq("id", wf.id);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const slot = `retry-${Date.now()}`;
+      const runId = automationRunId(wf.id, today, slot);
+      await deps.db.from("automation_runs").insert({
+        id: runId,
+        org_id: req.auth!.orgId,
+        workflow_id: wf.id,
+        run_date: today,
+        slot,
+        status: "queued",
+      });
+      await deps.queues.autoPlan.add("plan", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
+      logAudit(deps, { orgId: req.auth!.orgId, userId: req.auth!.userId, action: "automation.run_retry", entity: `run:${runId}`, meta: { retry_of: run.id } });
+      return { run_id: runId };
     },
   );
 }

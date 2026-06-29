@@ -123,6 +123,10 @@ export const runConfigSchema = z.object({
     .enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"])
     .default("PUBLIC_TO_EVERYONE"),
   credits_per_scene: z.coerce.number().int().min(0).default(0),
+  // ── tratamento de erros (estilo n8n) ──
+  on_error: z.enum(["stop", "continue"]).default("stop"),
+  max_tries: z.coerce.number().int().min(1).max(5).default(2),
+  retry_wait_s: z.coerce.number().int().min(0).max(120).default(5),
 });
 
 /** lê a config de run do compiled_plan do workflow (com defaults) */

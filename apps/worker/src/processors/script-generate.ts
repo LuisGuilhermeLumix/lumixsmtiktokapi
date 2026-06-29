@@ -12,6 +12,7 @@ import {
 } from "@lsm/shared";
 import type { WorkerDeps } from "../deps.js";
 import { loadRunContext, logStep } from "../lib/auto-runtime.js";
+import { withRetry } from "../lib/retry.js";
 
 function hashNum(s: string): number {
   let h = 0;
@@ -65,13 +66,17 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     // agente diretor → roteiro
     let script: string;
     try {
-      script = await kieLLM(
-        key,
-        llm,
-        `${config.director_prompt}\n\nNicho: ${niche}\n${charNote}\n` +
-          (hook ? `Comece com o gancho: "${hook.text}".\n` : "") +
-          `Escreva um roteiro de vídeo curto para TikTok dividido em ${config.num_scenes} cena(s), ` +
-          `cada cena uma frase visual descritiva (em inglês), uma por linha.`,
+      script = await withRetry(
+        () =>
+          kieLLM(
+            key,
+            llm,
+            `${config.director_prompt}\n\nNicho: ${niche}\n${charNote}\n` +
+              (hook ? `Comece com o gancho: "${hook.text}".\n` : "") +
+              `Escreva um roteiro de vídeo curto para TikTok dividido em ${config.num_scenes} cena(s), ` +
+              `cada cena uma frase visual descritiva (em inglês), uma por linha.`,
+          ),
+        { tries: config.max_tries, waitMs: config.retry_wait_s * 1000 },
       );
     } catch (e) {
       await deps.db.from("automation_videos").update({ status: "failed", error: `diretor: ${(e as Error).message}`.slice(0, 500) }).eq("id", video.id);
