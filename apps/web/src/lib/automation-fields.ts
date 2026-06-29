@@ -93,7 +93,7 @@ export const NODE_FIELDS: Record<NodeType, FieldSpec[]> = {
     ], default: "wait_all" },
   ],
   DirectorAgent: [
-    { key: "system_prompt", label: "Prompt do agente (roteiro)", type: "textarea", placeholder: "Você é um roteirista…", default: "" },
+    { key: "system_prompt", label: "Prompt do agente (roteiro)", type: "textarea", placeholder: "Você é um roteirista… Variáveis: {{ $niche }} {{ $account.display_name }} {{ $character.name }} {{ $today }}", default: "" },
     { key: "num_scenes", label: "Número de cenas", type: "slider", min: 1, max: 12, default: 1 },
     { key: "llm_model", label: "Modelo LLM (OpenAI)", type: "select", options: OPENAI_MODELS, default: "gpt-4.1" },
     // tratamento de erros (estilo n8n) — vale para todo o pipeline do run
@@ -112,7 +112,7 @@ export const NODE_FIELDS: Record<NodeType, FieldSpec[]> = {
     { key: "lang", label: "Idioma (opcional)", type: "text", placeholder: "pt-BR" },
   ],
   CaptionAgent: [
-    { key: "system_prompt", label: "Prompt da legenda", type: "textarea", default: "" },
+    { key: "system_prompt", label: "Prompt da legenda", type: "textarea", placeholder: "Variáveis: {{ $niche }} {{ $account.display_name }} {{ $today }}", default: "" },
     { key: "llm_model", label: "Modelo LLM (OpenAI)", type: "select", options: OPENAI_MODELS, default: "gpt-4.1" },
     { key: "max_len", label: "Tamanho máx.", type: "number", min: 1, max: 2200, default: 2200 },
   ],
