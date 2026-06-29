@@ -1,47 +1,32 @@
 // Créditos do motor: RESERVA no plan, SETTLE/REFUND no fim (princípio #6).
-// Idempotência pelos campos credits_reserved/credits_settled do run.
+// Operações ATÔMICAS via RPC (charge_credits/refund_credits) — sem race de
+// read-modify-write. Idempotência pelos campos credits_reserved/credits_settled.
 
-import type { Tables } from "@lsm/db";
 import type { WorkerDeps } from "../deps.js";
-
-async function adjustBalance(deps: WorkerDeps, orgId: string, delta: number, reason: string) {
-  const { data: org } = await deps.db
-    .from("organizations")
-    .select("credits_balance")
-    .eq("id", orgId)
-    .single();
-  if (!org) return;
-  const balanceAfter = org.credits_balance + delta;
-  await deps.db.from("organizations").update({ credits_balance: balanceAfter }).eq("id", orgId);
-  await deps.db
-    .from("credit_ledger")
-    .insert({ org_id: orgId, delta, reason, balance_after: balanceAfter });
-}
 
 /** reserva créditos do run (idempotente). Retorna false se saldo insuficiente. */
 export async function reserveRunCredits(
   deps: WorkerDeps,
-  run: Tables<"automation_runs">,
+  run: { id: string; org_id: string; credits_reserved: number },
   amount: number,
 ): Promise<boolean> {
   if (run.credits_reserved > 0) return true; // já reservado
   if (amount <= 0) return true;
-  const { data: org } = await deps.db
-    .from("organizations")
-    .select("credits_balance")
-    .eq("id", run.org_id)
-    .single();
-  if (!org || org.credits_balance < amount) return false;
-  await adjustBalance(deps, run.org_id, -amount, `automation_reserve:${run.id}`);
+  const { data, error } = await deps.db.rpc("charge_credits", {
+    p_org: run.org_id,
+    p_amount: amount,
+    p_reason: `automation_reserve:${run.id}`,
+  });
+  if (error || (typeof data === "number" && data < 0)) return false; // saldo insuficiente
   await deps.db.from("automation_runs").update({ credits_reserved: amount }).eq("id", run.id);
   return true;
 }
 
-/** liquida o run: cobra o que foi efetivamente usado e estorna o restante. */
+/** liquida o run: cobra o que foi usado e estorna o restante (atômico). */
 export async function settleRun(deps: WorkerDeps, runId: string): Promise<void> {
   const { data: run } = await deps.db
     .from("automation_runs")
-    .select("*")
+    .select("org_id, credits_reserved, credits_settled")
     .eq("id", runId)
     .maybeSingle();
   if (!run || run.credits_settled > 0) return; // já liquidado
@@ -61,6 +46,12 @@ export async function settleRun(deps: WorkerDeps, runId: string): Promise<void> 
   }
 
   const refund = run.credits_reserved - used;
-  if (refund > 0) await adjustBalance(deps, run.org_id, refund, `automation_refund:${runId}`);
+  if (refund > 0) {
+    await deps.db.rpc("refund_credits", {
+      p_org: run.org_id,
+      p_amount: refund,
+      p_reason: `automation_refund:${runId}`,
+    });
+  }
   await deps.db.from("automation_runs").update({ credits_settled: used }).eq("id", runId);
 }

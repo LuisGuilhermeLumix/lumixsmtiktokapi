@@ -97,6 +97,11 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
 
   app.setErrorHandler((err: FastifyError | HttpError | TikTokApiError, req, reply) => {
     if (err instanceof HttpError) {
+      // 5xx não vaza a mensagem interna (pode conter detalhe de DB)
+      if (err.statusCode >= 500) {
+        req.log.error({ err }, "erro 5xx");
+        return reply.code(err.statusCode).send({ error: "Erro interno" });
+      }
       return reply.code(err.statusCode).send({ error: err.message });
     }
     if (err instanceof TikTokApiError) {
@@ -108,9 +113,12 @@ export async function buildApp(deps: ApiDeps): Promise<FastifyInstance> {
     }
     const fastifyErr = err as FastifyError;
     if (fastifyErr.validation) {
-      return reply
-        .code(400)
-        .send({ error: "Validação falhou", details: fastifyErr.validation });
+      // não ecoa o output bruto do validador (estrutura interna); só os campos
+      const fields = fastifyErr.validation
+        .map((v) => v.instancePath?.replace(/^\//, "") || v.params?.missingProperty)
+        .filter(Boolean)
+        .join(", ");
+      return reply.code(400).send({ error: fields ? `Campos inválidos: ${fields}` : "Validação falhou" });
     }
     const status =
       typeof fastifyErr.statusCode === "number" && fastifyErr.statusCode >= 400

@@ -35,7 +35,8 @@ export function registerAutomationRoutes(
         .from("niche_packs")
         .select("*")
         .or(`org_id.is.null,org_id.eq.${req.auth!.orgId}`)
-        .order("name", { ascending: true });
+        .order("name", { ascending: true })
+        .limit(500);
       if (error) throw httpError(500, error.message);
       return { niche_packs: data ?? [] };
     },
@@ -191,7 +192,8 @@ export function registerAutomationRoutes(
         .from("characters")
         .select("*")
         .eq("org_id", req.auth!.orgId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(300);
       if (error) throw httpError(500, error.message);
       return { characters: data ?? [] };
     },

@@ -12,7 +12,8 @@ import { httpError } from "../lib/errors.js";
 
 export function registerApiKeyRoutes(app: FastifyInstance, deps: ApiDeps, auth: AuthHooks): void {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const adminOnly = [auth.authenticate, auth.requireRole("owner", "admin")];
+  // gerência de API key exige sessão de usuário (uma key não cria/revoga keys)
+  const adminOnly = [auth.authenticate, auth.requireUserSession, auth.requireRole("owner", "admin")];
 
   r.get(
     "/api-keys",
