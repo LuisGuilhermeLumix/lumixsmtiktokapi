@@ -15,7 +15,7 @@ export type RunStatus = "pending" | "running" | "done" | "failed";
 export interface EditorData {
   packs: Array<{ id: string; name: string }>;
   characters: Array<{ id: string; name: string }>;
-  /** status de execução por TIPO de nó (para a animação nó-a-nó) */
+  /** status de execução por ID de nó (animação nó-a-nó, seguindo as conexões) */
   nodeStatus: Record<string, RunStatus>;
 }
 const EditorContext = createContext<EditorData>({ packs: [], characters: [], nodeStatus: {} });
@@ -307,8 +307,8 @@ function LsmNodeImpl({ id, data, selected }: NodeProps) {
   const fields = NODE_FIELDS[d.nodeType] ?? [];
   const Icon = CAT_LUCIDE[cat];
 
-  // estado de execução (animação nó-a-nó)
-  const rs = nodeStatus[d.nodeType];
+  // estado de execução (animação nó-a-nó, por ID — segue as conexões)
+  const rs = nodeStatus[id];
   const runActive = Object.keys(nodeStatus).length > 0;
   const ringColor = rs === "done" ? "#10b981" : rs === "failed" ? "#ef4444" : color;
   const boxShadow = rs

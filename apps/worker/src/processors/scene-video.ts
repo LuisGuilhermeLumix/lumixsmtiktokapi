@@ -2,10 +2,10 @@
 // (callback = principal, princípio #8) e agenda o scene-poll como fallback.
 
 import type { Job } from "bullmq";
-import { kieCreateTask, KieError } from "@lsm/shared/kie";
+import { KieError } from "@lsm/shared/kie";
 import { toBullJobId, type SceneVideoJobData, type ScenePollJobData } from "@lsm/shared";
 import type { WorkerDeps } from "../deps.js";
-import { loadRunContext, logStep } from "../lib/auto-runtime.js";
+import { finalizeRunIfDone, loadRunContext, logStep } from "../lib/auto-runtime.js";
 import { withRetry } from "../lib/retry.js";
 
 const POLL_DELAY_MS = 20_000;
@@ -40,7 +40,7 @@ export function createSceneVideoProcessor(deps: WorkerDeps) {
     try {
       const taskId = await withRetry(
         () =>
-          kieCreateTask(key, {
+          deps.provider.createTask({
             model: config.video_model,
             input: {
               prompt: scene.prompt ?? scene.beat ?? "",
@@ -58,7 +58,7 @@ export function createSceneVideoProcessor(deps: WorkerDeps) {
       );
       await deps.db
         .from("automation_scenes")
-        .update({ status: "video", provider: "kie", provider_task_id: taskId, error: null })
+        .update({ status: "video", provider: deps.provider.name, provider_task_id: taskId, error: null })
         .eq("id", scene.id);
       // fallback: poll mesmo que o callback não chegue
       const data: ScenePollJobData = { sceneId: scene.id, attempt: 0 };
@@ -81,6 +81,7 @@ export function createSceneVideoProcessor(deps: WorkerDeps) {
           .update({ status: "failed", error: `cena ${scene.idx} falhou: ${(e as Error).message}`.slice(0, 500) })
           .eq("id", scene.video_id)
           .neq("status", "published");
+        await finalizeRunIfDone(deps, run.id); // não vaza inflight
       } else {
         // política "continuar": segue best-effort (junta as cenas que deram certo)
         const { maybeEnqueueStitch } = await import("../lib/auto-runtime.js");

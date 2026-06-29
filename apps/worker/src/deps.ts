@@ -6,6 +6,7 @@ import {
   QUEUE_AUTO_PLAN,
   QUEUE_AUTO_SCAN,
   QUEUE_AUTOMATION,
+  QUEUE_GRAPH_EXEC,
   QUEUE_PUBLISH,
   QUEUE_SCENE_POLL,
   QUEUE_SCENE_VIDEO,
@@ -27,12 +28,14 @@ import {
 } from "@lsm/shared";
 import type { TikTokOAuthConfig } from "@lsm/tiktok";
 import type { WorkerConfig } from "./config.js";
+import { createProvider, type GenerationProvider } from "./providers/index.js";
 
 export interface WorkerDeps {
   config: WorkerConfig;
   tiktok: TikTokOAuthConfig;
   db: Db;
   redis: Redis;
+  provider: GenerationProvider;
   queues: {
     publish: Queue<PublishJobData>;
     status: Queue<StatusJobData>;
@@ -46,6 +49,7 @@ export interface WorkerDeps {
     sceneVideo: Queue<SceneVideoJobData>;
     scenePoll: Queue<ScenePollJobData>;
     videoStitch: Queue<VideoStitchJobData>;
+    graphExec: Queue<AutoPlanJobData>;
   };
 }
 
@@ -71,6 +75,7 @@ export function createDeps(config: WorkerConfig): WorkerDeps {
     },
     db: createServiceClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY),
     redis,
+    provider: createProvider(config.KIE_API_KEY),
     queues: {
       publish: new Queue<PublishJobData>(QUEUE_PUBLISH, { connection: redis, defaultJobOptions }),
       status: new Queue<StatusJobData>(QUEUE_STATUS, { connection: redis, defaultJobOptions }),
@@ -95,6 +100,7 @@ export function createDeps(config: WorkerConfig): WorkerDeps {
         connection: redis,
         defaultJobOptions,
       }),
+      graphExec: new Queue<AutoPlanJobData>(QUEUE_GRAPH_EXEC, { connection: redis, defaultJobOptions }),
     },
   };
 }
@@ -112,6 +118,7 @@ export async function closeDeps(deps: WorkerDeps): Promise<void> {
     deps.queues.sceneVideo.close(),
     deps.queues.scenePoll.close(),
     deps.queues.videoStitch.close(),
+    deps.queues.graphExec.close(),
     deps.redis.quit(),
   ]);
 }

@@ -3,7 +3,7 @@
 // (best-effort). É idempotente: se a cena já terminou, sai.
 
 import type { Job } from "bullmq";
-import { kieRecordInfo, creditsForModel } from "@lsm/shared/kie";
+import { creditsForModel } from "@lsm/shared/kie";
 import { toBullJobId, type ScenePollJobData } from "@lsm/shared";
 import type { WorkerDeps } from "../deps.js";
 import { loadRunContext, logStep, maybeEnqueueStitch } from "../lib/auto-runtime.js";
@@ -33,7 +33,7 @@ export function createScenePollProcessor(deps: WorkerDeps) {
 
     let rec;
     try {
-      rec = await kieRecordInfo(key, scene.provider_task_id);
+      rec = await deps.provider.recordInfo(scene.provider_task_id);
     } catch {
       // rede → re-tenta
       if (attempt < MAX_POLLS) {

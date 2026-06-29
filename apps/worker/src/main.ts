@@ -15,6 +15,7 @@ import {
   QUEUE_SCENE_POLL,
   QUEUE_SCENE_VIDEO,
   QUEUE_SCRIPT_GEN,
+  QUEUE_GRAPH_EXEC,
   QUEUE_STATUS,
   QUEUE_TOKEN_REFRESH,
   QUEUE_VIDEO_STITCH,
@@ -33,6 +34,7 @@ import { createScriptGenProcessor } from "./processors/script-generate.js";
 import { createStatusProcessor } from "./processors/status.js";
 import { createTokenRefreshProcessor } from "./processors/token-refresh.js";
 import { createVideoStitchProcessor } from "./processors/video-stitch.js";
+import { createGraphExecProcessor } from "./processors/graph-exec.js";
 
 // rastreamento de erros — no-op se SENTRY_DSN não estiver definido
 Sentry.init({
@@ -75,6 +77,8 @@ async function main() {
     new Worker(QUEUE_SCENE_POLL, createScenePollProcessor(deps), { connection, concurrency: 8 }),
     // FFmpeg: worker dedicado, concorrência baixa (CPU + memória)
     new Worker(QUEUE_VIDEO_STITCH, createVideoStitchProcessor(deps), { connection, concurrency: 2 }),
+    // executor de grafo real (nó a nó) — usado pelo "Motor real" do designer
+    new Worker(QUEUE_GRAPH_EXEC, createGraphExecProcessor(deps), { connection, concurrency: 3 }),
   ];
 
   for (const worker of workers) {

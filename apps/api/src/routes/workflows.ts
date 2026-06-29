@@ -312,7 +312,12 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
         slot,
         status: "queued",
       });
-      await deps.queues.autoPlan.add("plan", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
+      const engine = (req.query as { engine?: string } | undefined)?.engine;
+      if (engine === "graph") {
+        await deps.queues.graphExec.add("exec", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
+      } else {
+        await deps.queues.autoPlan.add("plan", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
+      }
       const result = { run_id: runId };
       if (idemKey) await idemSet(deps, req.auth!.orgId, idemKey, result);
       return result;
@@ -446,6 +451,9 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
       if (ids2.length) {
         await deps.db.from("automation_videos").update({ status: "failed", error: "cancelado" }).eq("run_id", run.id).neq("status", "published");
         await deps.db.from("automation_scenes").update({ status: "failed", error: "cancelado" }).in("video_id", ids2).not("status", "in", "(done,failed)");
+        // libera o contador de fairness (senão a org fica "no limite" para sempre)
+        const left = await deps.redis.decrby(`inflight:${run.org_id}`, ids2.length);
+        if (left < 0) await deps.redis.set(`inflight:${run.org_id}`, "0");
       }
       logAudit(deps, { orgId: req.auth!.orgId, userId: req.auth!.userId, action: "automation.run_cancel", entity: `run:${run.id}` });
       return { run_id: run.id, status: "failed" };

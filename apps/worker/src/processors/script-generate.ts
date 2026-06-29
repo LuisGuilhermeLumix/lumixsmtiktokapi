@@ -2,7 +2,6 @@
 // a legenda; seleciona o hook do niche pack (rotação) e cria as cenas.
 
 import type { Job } from "bullmq";
-import { kieLLM } from "@lsm/shared/kie";
 import { resolveExpressions } from "@lsm/shared/automation";
 import { selectHook, sanitizeText } from "@lsm/shared/niche";
 import {
@@ -12,7 +11,7 @@ import {
   type SceneVideoJobData,
 } from "@lsm/shared";
 import type { WorkerDeps } from "../deps.js";
-import { loadRunContext, logStep } from "../lib/auto-runtime.js";
+import { finalizeRunIfDone, loadRunContext, logStep } from "../lib/auto-runtime.js";
 import { withRetry } from "../lib/retry.js";
 
 function hashNum(s: string): number {
@@ -54,6 +53,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
 
     if (!key) {
       await deps.db.from("automation_videos").update({ status: "failed", error: "sem KIE_API_KEY" }).eq("id", video.id);
+      await finalizeRunIfDone(deps, video.run_id); // não vaza inflight
       return;
     }
 
@@ -89,8 +89,7 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     try {
       script = await withRetry(
         () =>
-          kieLLM(
-            key,
+          deps.provider.llm(
             llm,
             `${directorPrompt}\n\nNicho: ${niche}\n${charNote}\n` +
               (hook ? `Comece com o gancho: "${hook.text}".\n` : "") +
@@ -102,14 +101,14 @@ export function createScriptGenProcessor(deps: WorkerDeps) {
     } catch (e) {
       await deps.db.from("automation_videos").update({ status: "failed", error: `diretor: ${(e as Error).message}`.slice(0, 500) }).eq("id", video.id);
       await logStep(deps, run, `script:${video.id}`, "failed");
+      await finalizeRunIfDone(deps, video.run_id); // não vaza inflight
       return;
     }
 
     // legenda
     let caption = "";
     try {
-      caption = await kieLLM(
-        key,
+      caption = await deps.provider.llm(
         llm,
         `${captionPrompt}\n\nNicho: ${niche}\nGere a legenda final para TikTok (curta, 2-3 hashtags).`,
       );
