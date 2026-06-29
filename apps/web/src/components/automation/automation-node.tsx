@@ -5,16 +5,30 @@
 
 import { createContext, memo, useContext } from "react";
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
+import { Check, Clapperboard, Clock, Copy, Database, GitBranch, Loader2, Send, Sparkles, X } from "lucide-react";
 import type { NodeType } from "@lsm/shared/automation";
 import { NODE_CATEGORY } from "@lsm/shared/automation";
-import { CAT_COLOR, NODE_FIELDS, NODE_ICON, defaultConfig, type FieldSpec } from "@/lib/automation-fields";
+import { CAT_COLOR, NODE_FIELDS, defaultConfig, type FieldSpec } from "@/lib/automation-fields";
+
+export type RunStatus = "pending" | "running" | "done" | "failed";
 
 export interface EditorData {
   packs: Array<{ id: string; name: string }>;
   characters: Array<{ id: string; name: string }>;
+  /** status de execução por TIPO de nó (para a animação nó-a-nó) */
+  nodeStatus: Record<string, RunStatus>;
 }
-const EditorContext = createContext<EditorData>({ packs: [], characters: [] });
+const EditorContext = createContext<EditorData>({ packs: [], characters: [], nodeStatus: {} });
 export const EditorProvider = EditorContext.Provider;
+
+const CAT_LUCIDE = {
+  trigger: Clock,
+  flow: GitBranch,
+  ai: Sparkles,
+  media: Clapperboard,
+  data: Database,
+  output: Send,
+} as const;
 
 type Cfg = Record<string, unknown>;
 export interface LsmNodeData extends Record<string, unknown> {
@@ -113,10 +127,23 @@ function Field({
 
 function LsmNodeImpl({ id, data, selected }: NodeProps) {
   const rf = useReactFlow();
+  const { nodeStatus } = useContext(EditorContext);
   const d = data as LsmNodeData;
   const cat = NODE_CATEGORY[d.nodeType] ?? "flow";
   const color = CAT_COLOR[cat] ?? "#6b7280";
   const fields = NODE_FIELDS[d.nodeType] ?? [];
+  const Icon = CAT_LUCIDE[cat];
+
+  // estado de execução (animação nó-a-nó)
+  const rs = nodeStatus[d.nodeType];
+  const runActive = Object.keys(nodeStatus).length > 0;
+  const ringColor = rs === "done" ? "#10b981" : rs === "failed" ? "#ef4444" : color;
+  const boxShadow = rs
+    ? `0 0 0 2px ${ringColor}, 0 0 18px ${ringColor}55`
+    : selected
+      ? `0 0 0 2px ${color}55`
+      : undefined;
+  const dim = runActive && !rs;
 
   function set(key: string, v: unknown) {
     rf.updateNodeData(id, { config: { ...d.config, [key]: v } });
@@ -137,17 +164,24 @@ function LsmNodeImpl({ id, data, selected }: NodeProps) {
 
   return (
     <div
-      className="w-60 rounded-xl border bg-surface-raised shadow-xl"
-      style={{ borderColor: color, boxShadow: selected ? `0 0 0 2px ${color}55` : undefined }}
+      className={`w-60 rounded-xl border bg-surface-raised shadow-xl transition-opacity duration-300 ${rs === "running" ? "animate-pulse" : ""} ${dim ? "opacity-40" : "opacity-100"}`}
+      style={{ borderColor: ringColor, boxShadow }}
     >
       <Handle type="target" position={Position.Left} style={{ background: color, width: 9, height: 9 }} />
       <div className="flex items-center justify-between rounded-t-xl px-3 py-2" style={{ background: `${color}22` }}>
-        <span className="flex items-center gap-2 text-xs font-semibold text-ink">
-          <span>{NODE_ICON[cat]}</span> {d.nodeType}
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+          <Icon className="size-3.5" style={{ color }} /> {d.nodeType}
         </span>
-        <span className="flex gap-1">
-          <button onClick={duplicate} title="Duplicar" className="nodrag text-ink-faint hover:text-ink">⧉</button>
-          <button onClick={remove} title="Excluir" className="nodrag text-ink-faint hover:text-red-400">✕</button>
+        <span className="flex items-center gap-1">
+          {rs === "running" && <Loader2 className="size-3.5 animate-spin" style={{ color }} />}
+          {rs === "done" && <Check className="size-3.5 text-emerald-400" />}
+          {rs === "failed" && <X className="size-3.5 text-red-400" />}
+          <button onClick={duplicate} title="Duplicar" className="nodrag text-ink-faint hover:text-ink">
+            <Copy className="size-3.5" />
+          </button>
+          <button onClick={remove} title="Excluir" className="nodrag text-ink-faint hover:text-red-400">
+            <X className="size-3.5" />
+          </button>
         </span>
       </div>
       {fields.length > 0 ? (
