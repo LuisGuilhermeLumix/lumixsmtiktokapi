@@ -130,10 +130,10 @@ export async function createPost(deps: ApiDeps, input: CreatePostInput): Promise
   if (tgtErr || !targets) throw httpError(500, `Falha ao criar alvos: ${tgtErr?.message}`);
 
   if (input.publishNow) {
-    for (const t of targets) await enqueueTarget(deps, t.id);
+    await Promise.all(targets.map((t) => enqueueTarget(deps, t.id)));
   } else if (input.scheduleAt) {
     const delay = input.scheduleAt.getTime() - Date.now();
-    for (const t of targets) await enqueueTarget(deps, t.id, delay);
+    await Promise.all(targets.map((t) => enqueueTarget(deps, t.id, delay)));
   }
 
   logAudit(deps, {
@@ -177,7 +177,7 @@ export async function publishPostNow(
       pending.map((t) => t.id),
     );
 
-  for (const t of pending) await enqueueTarget(deps, t.id);
+  await Promise.all(pending.map((t) => enqueueTarget(deps, t.id)));
 
   logAudit(deps, {
     orgId: post.org_id,

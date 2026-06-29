@@ -120,10 +120,10 @@ export async function finalizeRunIfDone(deps: WorkerDeps, runId: string): Promis
   if (pending) return;
 
   const anyOk = list.some((v) => v.status === "published");
+  const target = anyOk ? (list.every((v) => v.status === "published") ? "done" : "partial") : "failed";
+  // transição ATÔMICA: só o vencedor liquida créditos e libera inflight
+  const { data: won } = await deps.db.rpc("finalize_run", { p_run_id: runId, p_status: target });
+  if (!won) return;
   await settleRun(deps, runId);
-  await decrInflight(deps, run.org_id, list.length); // libera a capacidade da org
-  await deps.db
-    .from("automation_runs")
-    .update({ status: anyOk ? (list.every((v) => v.status === "published") ? "done" : "partial") : "failed" })
-    .eq("id", runId);
+  await decrInflight(deps, run.org_id, list.length);
 }

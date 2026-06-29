@@ -2,16 +2,21 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type { Client, SocialAccount } from "@/lib/types";
-import { Banner, Button, Card, EmptyState, Modal, Spinner } from "@/components/ui";
+import { Banner, Button, Card, EmptyState, Input, Label, Modal, Spinner, Textarea } from "@/components/ui";
 import { StatusBadge } from "@/components/status-badge";
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const search = useSearchParams();
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const tiktokResult = search.get("tiktok"); // connected | denied | error (vindo do callback)
 
   const [client, setClient] = useState<Client | null>(null);
@@ -20,6 +25,13 @@ export default function ClientDetailPage() {
   const [connecting, setConnecting] = useState(false);
   const [toDisconnect, setToDisconnect] = useState<SocialAccount | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copyId(id: string) {
+    await navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+  }
 
   const load = useCallback(() => {
     apiFetch<{ clients: Client[] }>("/clients")
@@ -47,6 +59,34 @@ export default function ClientDetailPage() {
     }
   }
 
+  function openEdit() {
+    setEditName(client?.name ?? "");
+    setEditNotes(client?.notes ?? "");
+    setEditOpen(true);
+  }
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingEdit(true);
+    try {
+      await apiFetch(`/clients/${id}`, { method: "PATCH", body: { name: editName, notes: editNotes || null } });
+      setEditOpen(false);
+      load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+  async function removeClient() {
+    if (!confirm("Excluir este cliente? As contas conectadas e o histórico serão removidos.")) return;
+    try {
+      await apiFetch(`/clients/${id}`, { method: "DELETE" });
+      router.push("/clients");
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   async function connectTikTok() {
     setConnecting(true);
     try {
@@ -69,11 +109,29 @@ export default function ClientDetailPage() {
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-bold">{client?.name ?? "…"}</h1>
-          <Button onClick={connectTikTok} disabled={connecting}>
-            {connecting ? <Spinner /> : "Conectar TikTok"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={openEdit}>
+              Editar
+            </Button>
+            <Button variant="danger" onClick={removeClient}>
+              Excluir
+            </Button>
+            <Button onClick={connectTikTok} disabled={connecting}>
+              {connecting ? <Spinner /> : "Conectar TikTok"}
+            </Button>
+          </div>
         </div>
         {client?.notes && <p className="mt-1 text-sm text-ink-faint">{client.notes}</p>}
+        <p className="mt-1 flex items-center gap-2">
+          <code className="font-mono text-[11px] text-ink-dim">client_id: {id}</code>
+          <button
+            type="button"
+            onClick={() => copyId(id)}
+            className="text-[11px] text-lumix-blue hover:underline"
+          >
+            {copiedId === id ? "copiado!" : "copiar"}
+          </button>
+        </p>
       </div>
 
       {tiktokResult === "connected" && (
@@ -121,6 +179,18 @@ export default function ClientDetailPage() {
                   <p className="text-xs text-ink-faint">
                     conectada em {formatDateTime(a.connected_at)}
                   </p>
+                  <p className="mt-0.5 flex items-center gap-2">
+                    <code className="font-mono text-[11px] text-ink-dim">
+                      social_account_id: {a.id}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => copyId(a.id)}
+                      className="text-[11px] text-lumix-blue hover:underline"
+                    >
+                      {copiedId === a.id ? "copiado!" : "copiar"}
+                    </button>
+                  </p>
                 </div>
                 <StatusBadge status={a.status} />
                 {a.status === "connected" ? (
@@ -137,6 +207,27 @@ export default function ClientDetailPage() {
           </ul>
         )}
       </Card>
+
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar cliente">
+        <form onSubmit={saveEdit} className="space-y-4">
+          <div>
+            <Label htmlFor="ename">Nome</Label>
+            <Input id="ename" required value={editName} onChange={(e) => setEditName(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="enotes">Notas</Label>
+            <Textarea id="enotes" rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={savingEdit}>
+              {savingEdit ? <Spinner /> : "Salvar"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         open={toDisconnect !== null}

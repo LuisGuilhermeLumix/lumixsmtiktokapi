@@ -10,7 +10,7 @@ import { creditsForModel, kieCreateTask, kieRecordInfo, KieError } from "@lsm/sh
 import { mhCreateVideo, mhGetVideo, MagicHourError } from "@lsm/shared/magichour";
 import type { Json, Tables } from "@lsm/db";
 import type { ApiDeps } from "../deps.js";
-import { assertClientAccess } from "../lib/access.js";
+import { assertAccountAccess, assertClientAccess } from "../lib/access.js";
 import type { AuthHooks } from "../lib/auth.js";
 import { httpError } from "../lib/errors.js";
 
@@ -36,7 +36,7 @@ function mapGeneration(g: Tables<"generations">) {
   };
 }
 
-/** debita créditos da org (lança 402 se insuficiente) e registra na razão */
+/** debita créditos da org de forma ATÔMICA (lança 402 se insuficiente) */
 async function chargeCredits(
   deps: ApiDeps,
   orgId: string,
@@ -45,27 +45,19 @@ async function chargeCredits(
   generationId?: string,
 ): Promise<void> {
   if (amount <= 0) return;
-  const { data: org, error } = await deps.db
-    .from("organizations")
-    .select("credits_balance")
-    .eq("id", orgId)
-    .single();
-  if (error || !org) throw httpError(500, "Falha ao ler saldo de créditos");
-  if (org.credits_balance < amount) {
-    throw httpError(402, `Créditos insuficientes (saldo ${org.credits_balance}, custo ${amount})`);
-  }
-  const balanceAfter = org.credits_balance - amount;
-  await deps.db.from("organizations").update({ credits_balance: balanceAfter }).eq("id", orgId);
-  await deps.db.from("credit_ledger").insert({
-    org_id: orgId,
-    delta: -amount,
-    reason,
-    generation_id: generationId ?? null,
-    balance_after: balanceAfter,
+  const { data, error } = await deps.db.rpc("charge_credits", {
+    p_org: orgId,
+    p_amount: amount,
+    p_reason: reason,
+    p_generation_id: generationId ?? null,
   });
+  if (error) throw httpError(500, "Falha ao debitar créditos");
+  if (typeof data === "number" && data < 0) {
+    throw httpError(402, "Créditos insuficientes. Faça upgrade ou recarregue para continuar.");
+  }
 }
 
-/** estorna créditos (ex.: geração falhou) */
+/** estorna créditos de forma atômica (ex.: geração falhou) */
 async function refundCredits(
   deps: ApiDeps,
   orgId: string,
@@ -73,20 +65,11 @@ async function refundCredits(
   generationId?: string,
 ): Promise<void> {
   if (amount <= 0) return;
-  const { data: org } = await deps.db
-    .from("organizations")
-    .select("credits_balance")
-    .eq("id", orgId)
-    .single();
-  if (!org) return;
-  const balanceAfter = org.credits_balance + amount;
-  await deps.db.from("organizations").update({ credits_balance: balanceAfter }).eq("id", orgId);
-  await deps.db.from("credit_ledger").insert({
-    org_id: orgId,
-    delta: amount,
-    reason: "refund",
-    generation_id: generationId ?? null,
-    balance_after: balanceAfter,
+  await deps.db.rpc("refund_credits", {
+    p_org: orgId,
+    p_amount: amount,
+    p_reason: "refund",
+    p_generation_id: generationId ?? null,
   });
 }
 
@@ -323,6 +306,11 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
     async (req, reply) => {
       const b = req.body;
       if (b.client_id) await assertClientAccess(deps, req.auth!, b.client_id);
+      // IDOR fix: a conta-alvo precisa pertencer à org do ator
+      const { account } = await assertAccountAccess(deps, req.auth!, b.social_account_id);
+      if (b.client_id && account.client_id !== b.client_id) {
+        throw httpError(400, "A conta não pertence ao cliente informado");
+      }
       const { data, error } = await deps.db
         .from("content_automations")
         .insert({
@@ -358,9 +346,60 @@ export function registerContentRoutes(app: FastifyInstance, deps: ApiDeps, auth:
         .from("content_automations")
         .select("*")
         .eq("org_id", req.auth!.orgId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(200);
       if (error) throw httpError(500, error.message);
       return { automations: data ?? [] };
+    },
+  );
+
+  // pausar/retomar a esteira (kill-switch — ela gasta créditos)
+  r.patch(
+    "/automations/:id",
+    {
+      preHandler: [auth.authenticate],
+      schema: {
+        tags: ["studio"],
+        description: "Pausa/retoma uma automação (esteira)",
+        params: z.object({ id: z.string().uuid() }),
+        body: z.object({ status: z.enum(["active", "paused"]) }),
+      },
+    },
+    async (req) => {
+      const { data, error } = await deps.db
+        .from("content_automations")
+        .update({ status: req.body.status })
+        .eq("id", req.params.id)
+        .eq("org_id", req.auth!.orgId)
+        .select("*")
+        .maybeSingle();
+      if (error) throw httpError(500, error.message);
+      if (!data) throw httpError(404, "Automação não encontrada");
+      return { automation: data };
+    },
+  );
+
+  r.delete(
+    "/automations/:id",
+    {
+      preHandler: [auth.authenticate],
+      schema: {
+        tags: ["studio"],
+        description: "Remove uma automação (esteira)",
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (req, reply) => {
+      const { data, error } = await deps.db
+        .from("content_automations")
+        .delete()
+        .eq("id", req.params.id)
+        .eq("org_id", req.auth!.orgId)
+        .select("id")
+        .maybeSingle();
+      if (error) throw httpError(500, error.message);
+      if (!data) throw httpError(404, "Automação não encontrada");
+      return reply.code(204).send();
     },
   );
 

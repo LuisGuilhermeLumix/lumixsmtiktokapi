@@ -29,6 +29,17 @@ const FREE_FALLBACK: Tables<"plans"> = {
   created_at: new Date(0).toISOString(),
 };
 
+// catálogo de planos é estático → cache curto em memória (evita 1 query/checagem)
+const planCache = new Map<string, { plan: Tables<"plans">; exp: number }>();
+async function loadPlan(deps: ApiDeps, planId: string): Promise<Tables<"plans">> {
+  const hit = planCache.get(planId);
+  if (hit && hit.exp > Date.now()) return hit.plan;
+  const { data } = await deps.db.from("plans").select("*").eq("id", planId).maybeSingle();
+  const plan = data ?? FREE_FALLBACK;
+  planCache.set(planId, { plan, exp: Date.now() + 60_000 });
+  return plan;
+}
+
 /** carrega o plano da org + uso atual (clientes e contas conectadas) */
 export async function getPlanContext(deps: ApiDeps, orgId: string): Promise<PlanContext> {
   const { data: org } = await deps.db
@@ -36,14 +47,9 @@ export async function getPlanContext(deps: ApiDeps, orgId: string): Promise<Plan
     .select("plan")
     .eq("id", orgId)
     .maybeSingle();
-  const planId = org?.plan ?? "free";
-  const { data: plan } = await deps.db.from("plans").select("*").eq("id", planId).maybeSingle();
+  const plan = await loadPlan(deps, org?.plan ?? "free");
 
-  const { count: clients } = await deps.db
-    .from("clients")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId);
-
+  // uma query para os ids (clientes = length) + contagem de contas conectadas
   const { data: clientRows } = await deps.db.from("clients").select("id").eq("org_id", orgId);
   const ids = (clientRows ?? []).map((c) => c.id);
   let social = 0;
@@ -56,10 +62,7 @@ export async function getPlanContext(deps: ApiDeps, orgId: string): Promise<Plan
     social = count ?? 0;
   }
 
-  return {
-    plan: plan ?? FREE_FALLBACK,
-    usage: { clients: clients ?? 0, social_accounts: social },
-  };
+  return { plan, usage: { clients: ids.length, social_accounts: social } };
 }
 
 function limitMsg(resource: string, planName: string): string {

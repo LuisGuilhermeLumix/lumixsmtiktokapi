@@ -30,7 +30,7 @@ export default function SignupPage() {
       password,
       options: {
         data: { workspace: workspace.trim() || email.split("@")[0] },
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     setLoading(false);
@@ -60,10 +60,23 @@ export default function SignupPage() {
           </p>
 
           {confirm ? (
-            <Banner kind="success">
-              Conta criada! Confirme seu e-mail clicando no link que enviamos para <b>{email}</b> e
-              depois faça login.
-            </Banner>
+            <div className="space-y-3">
+              <Banner kind="success">
+                Conta criada! Confirme seu e-mail clicando no link que enviamos para <b>{email}</b> e
+                depois faça login.
+              </Banner>
+              <button
+                type="button"
+                onClick={async () => {
+                  await createClient().auth.resend({ type: "signup", email });
+                  setError("E-mail de confirmação reenviado.");
+                }}
+                className="text-xs text-lumix-blue hover:underline"
+              >
+                Não recebeu? Reenviar e-mail
+              </button>
+              {error && <p className="text-xs text-ink-faint">{error}</p>}
+            </div>
           ) : (
             <form onSubmit={onSubmit} className="space-y-4">
               {error && <Banner kind="error">{error}</Banner>}

@@ -110,7 +110,8 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
         .from("automation_workflows")
         .select("id, name, status, client_id, post_times, timezone, last_run_at, created_at")
         .eq("org_id", req.auth!.orgId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(200);
       if (error) throw httpError(500, error.message);
       return { workflows: data ?? [] };
     },

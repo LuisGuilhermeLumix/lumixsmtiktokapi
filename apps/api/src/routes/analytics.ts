@@ -19,23 +19,31 @@ export function registerAnalyticsRoutes(
       preHandler: [auth.authenticate],
       schema: {
         tags: ["analytics"],
-        description: "Série temporal de snapshots de uma conta",
+        description: "Série temporal de snapshots de uma conta (days OU from/to)",
         params: z.object({ id: z.string().uuid() }),
         querystring: z.object({
           days: z.coerce.number().int().min(1).max(365).default(30),
+          from: z.string().datetime({ offset: true }).optional(),
+          to: z.string().datetime({ offset: true }).optional(),
         }),
       },
     },
     async (req) => {
       const { account } = await assertAccountAccess(deps, req.auth!, req.params.id);
-      const since = new Date(Date.now() - req.query.days * 86_400_000).toISOString();
+      // intervalo custom (from/to) tem prioridade sobre days
+      const useRange = req.query.from && req.query.to;
+      const since = useRange
+        ? req.query.from!
+        : new Date(Date.now() - req.query.days * 86_400_000).toISOString();
 
-      const { data, error } = await deps.db
+      let q = deps.db
         .from("analytics_snapshots")
         .select("captured_at, followers, following, likes, video_count")
         .eq("social_account_id", account.id)
         .gte("captured_at", since)
         .order("captured_at", { ascending: true });
+      if (useRange) q = q.lte("captured_at", req.query.to!);
+      const { data, error } = await q;
       if (error) throw httpError(500, error.message);
 
       return {
@@ -87,16 +95,16 @@ export function registerAnalyticsRoutes(
       // último snapshot por conta
       const latestByAccount = new Map<string, { followers: number; likes: number; video_count: number }>();
       if (accountIds.length > 0) {
-        const { data: snaps } = await deps.db
-          .from("analytics_snapshots")
-          .select("social_account_id, captured_at, followers, likes, video_count")
-          .in("social_account_id", accountIds)
-          .order("captured_at", { ascending: false })
-          .limit(accountIds.length * 4);
+        // RPC distinct-on: 1 snapshot (o mais recente) por conta, sem heurística
+        const { data: snaps } = await deps.db.rpc("latest_account_snapshots", {
+          p_account_ids: accountIds,
+        });
         for (const s of snaps ?? []) {
-          if (!latestByAccount.has(s.social_account_id)) {
-            latestByAccount.set(s.social_account_id, s);
-          }
+          latestByAccount.set(s.social_account_id, {
+            followers: s.followers,
+            likes: s.likes,
+            video_count: s.video_count,
+          });
         }
       }
 

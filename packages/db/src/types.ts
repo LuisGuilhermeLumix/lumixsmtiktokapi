@@ -973,6 +973,31 @@ export type Database = {
         Args: { p_client_id: string };
         Returns: boolean;
       };
+      charge_credits: {
+        Args: { p_org: string; p_amount: number; p_reason: string; p_generation_id?: string | null };
+        Returns: number;
+      };
+      refund_credits: {
+        Args: { p_org: string; p_amount: number; p_reason: string; p_generation_id?: string | null };
+        Returns: number;
+      };
+      consume_upload_quota: {
+        Args: { p_org: string; p_client: string; p_period: string };
+        Returns: boolean;
+      };
+      finalize_run: {
+        Args: { p_run_id: string; p_status: string };
+        Returns: boolean;
+      };
+      latest_account_snapshots: {
+        Args: { p_account_ids: string[] };
+        Returns: Array<{
+          social_account_id: string;
+          followers: number;
+          likes: number;
+          video_count: number;
+        }>;
+      };
     };
     Enums: {
       user_role: UserRole;

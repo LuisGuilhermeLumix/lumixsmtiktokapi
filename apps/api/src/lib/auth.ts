@@ -31,6 +31,9 @@ export interface AuthHooks {
   authenticate: preHandlerHookHandler;
   /** preHandler adicional: exige um dos papéis (usar APÓS authenticate) */
   requireRole: (...roles: UserRole[]) => preHandlerHookHandler;
+  /** preHandler: bloqueia auth via API key (só sessão de usuário). Least-privilege:
+   *  uma API key (n8n/curl) não pode gerenciar keys nem desconectar contas. */
+  requireUserSession: preHandlerHookHandler;
 }
 
 export function createAuthHooks(deps: ApiDeps): AuthHooks {
@@ -88,5 +91,12 @@ export function createAuthHooks(deps: ApiDeps): AuthHooks {
     };
   }
 
-  return { authenticate, requireRole };
+  const requireUserSession: preHandlerHookHandler = async (req: FastifyRequest) => {
+    if (!req.auth) throw httpError(401, "Não autenticado");
+    if (req.auth.via === "apikey") {
+      throw httpError(403, "Ação não permitida com API key — use a sessão do painel.");
+    }
+  };
+
+  return { authenticate, requireRole, requireUserSession };
 }

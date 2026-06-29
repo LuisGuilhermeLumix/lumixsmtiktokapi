@@ -19,7 +19,14 @@ export function registerClientRoutes(app: FastifyInstance, deps: ApiDeps, auth: 
     "/clients",
     {
       preHandler: [auth.authenticate],
-      schema: { tags: ["clients"], description: "Lista clientes visíveis ao ator" },
+      schema: {
+        tags: ["clients"],
+        description: "Lista clientes visíveis ao ator",
+        querystring: z.object({
+          limit: z.coerce.number().int().min(1).max(200).default(100),
+          offset: z.coerce.number().int().min(0).default(0),
+        }),
+      },
     },
     async (req) => {
       const ids = await visibleClientIds(deps, req.auth!);
@@ -29,7 +36,8 @@ export function registerClientRoutes(app: FastifyInstance, deps: ApiDeps, auth: 
         .from("clients")
         .select("*")
         .eq("org_id", req.auth!.orgId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(req.query.offset, req.query.offset + req.query.limit - 1);
       if (ids !== undefined) query = query.in("id", ids);
 
       const { data: clients, error } = await query;
@@ -143,7 +151,7 @@ export function registerClientRoutes(app: FastifyInstance, deps: ApiDeps, auth: 
   r.delete(
     "/clients/:clientId/accounts/:accountId",
     {
-      preHandler: [auth.authenticate, auth.requireRole("owner", "admin")],
+      preHandler: [auth.authenticate, auth.requireUserSession, auth.requireRole("owner", "admin")],
       schema: {
         tags: ["clients"],
         description:
