@@ -17,6 +17,19 @@ import { assertClientAccess } from "../lib/access.js";
 import { logAudit } from "../lib/audit.js";
 import type { AuthHooks } from "../lib/auth.js";
 import { httpError } from "../lib/errors.js";
+import { createHash } from "node:crypto";
+
+// ── idempotência (header Idempotency-Key) p/ mutations que criam runs ──
+function idemCacheKey(orgId: string, key: string): string {
+  return `idemp:${orgId}:${createHash("sha256").update(key).digest("hex")}`;
+}
+async function idemGet(deps: ApiDeps, orgId: string, key: string): Promise<unknown | null> {
+  const v = await deps.redis.get(idemCacheKey(orgId, key));
+  return v ? (JSON.parse(v) as unknown) : null;
+}
+async function idemSet(deps: ApiDeps, orgId: string, key: string, value: unknown): Promise<void> {
+  await deps.redis.set(idemCacheKey(orgId, key), JSON.stringify(value), "EX", 86_400); // 24h
+}
 
 const uuidParam = z.object({ id: z.string().uuid() });
 const graphSchema = z.object({
@@ -275,6 +288,11 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
     "/workflows/:id/test",
     { preHandler: [auth.authenticate], schema: { tags: ["automation"], params: uuidParam } },
     async (req) => {
+      const idemKey = req.headers["idempotency-key"] as string | undefined;
+      if (idemKey) {
+        const cached = await idemGet(deps, req.auth!.orgId, idemKey);
+        if (cached) return cached;
+      }
       const wf = await load(req.auth!.orgId, req.params.id);
       if (!wf) throw httpError(404, "Workflow não encontrado");
       const c = compileWorkflow(wf.id, wf.graph as unknown as AutomationGraph);
@@ -293,7 +311,9 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
         status: "queued",
       });
       await deps.queues.autoPlan.add("plan", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
-      return { run_id: runId };
+      const result = { run_id: runId };
+      if (idemKey) await idemSet(deps, req.auth!.orgId, idemKey, result);
+      return result;
     },
   );
 
@@ -409,6 +429,11 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
       schema: { tags: ["automation"], description: "Re-executa (retry) um run", params: z.object({ id: z.string().min(1) }) },
     },
     async (req) => {
+      const idemKey = req.headers["idempotency-key"] as string | undefined;
+      if (idemKey) {
+        const cached = await idemGet(deps, req.auth!.orgId, idemKey);
+        if (cached) return cached;
+      }
       const { data: run } = await deps.db
         .from("automation_runs")
         .select("id, workflow_id")
@@ -435,7 +460,9 @@ export function registerWorkflowRoutes(app: FastifyInstance, deps: ApiDeps, auth
       });
       await deps.queues.autoPlan.add("plan", { runId }, { jobId: toBullJobId(runId), attempts: 1 });
       logAudit(deps, { orgId: req.auth!.orgId, userId: req.auth!.userId, action: "automation.run_retry", entity: `run:${runId}`, meta: { retry_of: run.id } });
-      return { run_id: runId };
+      const result = { run_id: runId };
+      if (idemKey) await idemSet(deps, req.auth!.orgId, idemKey, result);
+      return result;
     },
   );
 }
