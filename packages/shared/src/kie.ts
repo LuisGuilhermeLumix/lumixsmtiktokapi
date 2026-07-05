@@ -37,8 +37,36 @@ function authHeaders(apiKey: string): Record<string, string> {
   return { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 }
 
-/** cria a task de geração; retorna o taskId da kie.ai */
+/** modelos Veo usam o endpoint DEDICADO /veo/generate (não o jobs/createTask) */
+const VEO_MODEL = /^veo3/i;
+
+/** cria a task de geração; retorna o taskId (prefixado "veo:" quando for Veo) */
 export async function kieCreateTask(apiKey: string, body: KieCreateInput): Promise<string> {
+  // ── Veo: endpoint próprio ──
+  if (VEO_MODEL.test(body.model)) {
+    const input = body.input as { prompt?: string; aspect_ratio?: string; imageUrls?: string[] };
+    const hasRef = Array.isArray(input.imageUrls) && input.imageUrls.length > 0;
+    const veoBody: Record<string, unknown> = {
+      model: body.model,
+      prompt: input.prompt ?? "",
+      aspect_ratio: input.aspect_ratio ?? "9:16",
+      ...(hasRef ? { imageUrls: input.imageUrls, generationType: "FIRST_AND_LAST_FRAMES_2_VIDEO" } : {}),
+      ...(body.callBackUrl ? { callBackUrl: body.callBackUrl } : {}),
+    };
+    const res = await fetch(`${KIE_BASE}/veo/generate`, {
+      method: "POST",
+      headers: authHeaders(apiKey),
+      body: JSON.stringify(veoBody),
+    });
+    const json = (await res.json().catch(() => ({}))) as { msg?: string; message?: string; data?: { taskId?: string } };
+    const taskId = json.data?.taskId;
+    if (!res.ok || !taskId) {
+      throw new KieError(res.status, json.msg || json.message || `veo generate falhou (HTTP ${res.status})`);
+    }
+    return `veo:${taskId}`;
+  }
+
+  // ── demais modelos: jobs/createTask ──
   const res = await fetch(`${KIE_BASE}/jobs/createTask`, {
     method: "POST",
     headers: authHeaders(apiKey),
@@ -110,6 +138,30 @@ function pickResultText(data: Record<string, unknown>): string | null {
 
 /** consulta o status de uma task e normaliza para o nosso GenerationStatus */
 export async function kieRecordInfo(apiKey: string, taskId: string): Promise<KieRecord> {
+  // ── Veo: endpoint próprio + successFlag (0 gerando, 1 ok, 2/3 falhou) ──
+  if (taskId.startsWith("veo:")) {
+    const realId = taskId.slice(4);
+    const res = await fetch(`${KIE_BASE}/veo/record-info?taskId=${encodeURIComponent(realId)}`, {
+      headers: authHeaders(apiKey),
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      msg?: string;
+      data?: { successFlag?: number; errorMessage?: string; response?: { resultUrls?: unknown }; resultUrls?: unknown };
+    };
+    const data = json.data ?? {};
+    const flag = Number(data.successFlag ?? 0);
+    const status: GenerationStatus = flag === 1 ? "done" : flag === 2 || flag === 3 ? "failed" : "processing";
+    const urls = (data.response?.resultUrls ?? data.resultUrls) as unknown;
+    const resultUrl = Array.isArray(urls) && urls.length ? String(urls[0]) : null;
+    return {
+      status: resultUrl && status !== "failed" ? "done" : status,
+      resultUrl,
+      resultText: null,
+      error: status === "failed" ? String(data.errorMessage ?? json.msg ?? "veo falhou") : null,
+      raw: json,
+    };
+  }
+
   const res = await fetch(`${KIE_BASE}/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`, {
     headers: authHeaders(apiKey),
   });

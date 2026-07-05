@@ -25,25 +25,20 @@ const PROVIDER = [
   { value: "magichour", label: "Magic Hour" },
 ];
 
-// Modelos de imagem (kie.ai) p/ as cenas
+// Modelos de imagem (kie.ai jobs/createTask) — IDs válidos do market da KIE
 const IMAGE_MODELS_OPTS = [
-  "google/nano-banana",
-  "google/imagen-4",
-  "ideogram/v3",
-  "qwen/image",
-  "recraft/v3",
-  "flux-2",
+  "nano-banana-pro",
+  "qwen/image-to-image",
+  "grok-imagine/image-to-image",
 ].map((m) => ({ value: m, label: m }));
 
-// Modelos de vídeo (kie.ai) p/ a geração das cenas
+// Modelos de vídeo — veo* usa o endpoint /veo/generate; demais o jobs/createTask
 const VIDEO_MODELS_OPTS = [
   "veo3_fast",
   "veo3",
-  "veo3_lite",
-  "sora2",
-  "kling/v2",
-  "bytedance/seedance-v1-pro",
-  "minimax/hailuo-02",
+  "kling-2.6/text-to-video",
+  "bytedance/seedance-2",
+  "grok-imagine/image-to-video",
 ].map((m) => ({ value: m, label: m }));
 
 // Modelos LLM (OpenAI) disponíveis para os agentes da automação.
@@ -119,7 +114,7 @@ export const NODE_FIELDS: Record<NodeType, FieldSpec[]> = {
   SafetyFilter: [{ key: "banned_terms", label: "Termos banidos", type: "stringList", placeholder: "celebrity, real person" }],
   SceneImage: [
     { key: "provider", label: "Provider", type: "select", options: PROVIDER, default: "kie" },
-    { key: "model", label: "Modelo", type: "select", options: IMAGE_MODELS_OPTS, default: "google/nano-banana" },
+    { key: "model", label: "Modelo", type: "select", options: IMAGE_MODELS_OPTS, default: "nano-banana-pro" },
     { key: "aspect_ratio", label: "Proporção", type: "select", options: ASPECT, default: "9:16" },
   ],
   VideoGen: [

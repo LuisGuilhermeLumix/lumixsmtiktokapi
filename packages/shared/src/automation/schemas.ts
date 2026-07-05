@@ -112,7 +112,7 @@ export const runConfigSchema = z.object({
   num_scenes: z.coerce.number().int().min(1).max(12).default(1),
   duration_per_scene: z.coerce.number().int().min(2).max(60).default(8),
   scene_provider: z.literal("kie").default("kie"),
-  image_model: z.string().default("google/nano-banana"),
+  image_model: z.string().default("nano-banana-pro"),
   video_model: z.string().default("veo3_fast"),
   director_prompt: z.string().default(""),
   caption_prompt: z.string().default(""),

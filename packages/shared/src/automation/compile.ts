@@ -83,7 +83,7 @@ export function compileWorkflow(workflowId: string, graph: AutomationGraph): Com
     videos_per_account: (accounts as { videos_per_account?: number }).videos_per_account ?? 1,
     num_scenes: (director as { num_scenes?: number }).num_scenes ?? 1,
     duration_per_scene: (videoGen as { duration_per_scene?: number }).duration_per_scene ?? 8,
-    image_model: (sceneImage as { model?: string }).model ?? "google/nano-banana",
+    image_model: (sceneImage as { model?: string }).model ?? "nano-banana-pro",
     video_model: (videoGen as { model?: string }).model ?? "veo3_fast",
     director_prompt: (director as { system_prompt?: string }).system_prompt ?? "",
     caption_prompt: (caption as { system_prompt?: string }).system_prompt ?? "",
